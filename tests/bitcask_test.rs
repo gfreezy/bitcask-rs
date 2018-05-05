@@ -7,9 +7,8 @@ use std::path::PathBuf;
 
 #[test]
 fn it_set_a_and_get_a() {
-    simple_logger::init().unwrap();
-
-    let mut bitcask = bitcask_rs::Bitcask::new(PathBuf::from("store"));
+    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("store")).build().unwrap();
+    let mut bitcask = bitcask_rs::Bitcask::new(config);
     let key = "1111";
     let set_ret = bitcask.set(key.to_string(), vec![1, 2, 3]);
     assert!(set_ret.is_ok());
@@ -25,7 +24,6 @@ fn it_set_a_and_get_a() {
     assert_eq!(no_exist.unwrap(), None);
 }
 
-
 fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
     for i in 1..end {
         let key = format!("{}", i);
@@ -34,10 +32,10 @@ fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
     }
 }
 
-
 #[test]
 fn it_should_compact() {
-    let mut bitcask = bitcask_rs::Bitcask::new(PathBuf::from("store3"));
+    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("store2")).build().unwrap();
+    let mut bitcask = bitcask_rs::Bitcask::new(config);
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
 
@@ -45,4 +43,20 @@ fn it_should_compact() {
     bitcask.compact().expect("compact");
     let ret2 = bitcask.get("1".to_string());
     assert_eq!(ret.unwrap(), ret2.unwrap());
+}
+
+
+#[test]
+fn it_should_build_from_segment_file() {
+    simple_logger::init().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("store3")).build().unwrap();
+    {
+        let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
+        populate_store(100, &mut bitcask);
+        populate_store(50, &mut bitcask);
+    }
+
+    let mut bitcask = bitcask_rs::Bitcask::open(config);
+    let ret = bitcask.get("1".to_string());
+    assert_eq!(ret.expect("u1").expect("u2"), vec![1, 2, 3, 4, 5]);
 }

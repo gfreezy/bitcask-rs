@@ -1,9 +1,9 @@
-use ::segment::Offset;
-use ::store::Store;
 use failure::Error;
+use segment::Offset;
 use std;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use store::Store;
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -11,23 +11,33 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub const TOMBSTONE: &str = "<<>>";
 
-#[derive(Builder, Clone)]
+#[derive(Default, Builder, Clone)]
 pub struct Config {
-    pub wal_path: String
+    pub wal_path: PathBuf,
 }
-
 
 pub struct Bitcask {
     hashmap: HashMap<Key, Offset>,
     store: Store,
+    config: Config,
 }
 
-
 impl Bitcask {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(config: Config) -> Self {
         Bitcask {
             hashmap: HashMap::new(),
-            store: Store::new(path, 0),
+            store: Store::new(&config.wal_path, 0),
+            config,
+        }
+    }
+
+    pub fn open(config: Config) -> Self {
+        let mut store = Store::open(&config.wal_path);
+        let hashmap = store.build_hashmap().expect("build hashmap from segment files");
+        Bitcask {
+            hashmap,
+            store,
+            config,
         }
     }
 
@@ -55,7 +65,7 @@ impl Bitcask {
                 self.hashmap.remove(&key);
                 Ok(())
             }
-            None => Ok(())
+            None => Ok(()),
         }
     }
 
