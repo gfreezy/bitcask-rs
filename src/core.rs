@@ -1,9 +1,11 @@
-use failure::Error;
+use failure::{Error, err_msg};
 use segment::Offset;
 use std;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use store::Store;
+use std::sync::RwLock;
+use std::sync::Arc;
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -17,27 +19,92 @@ pub struct Config {
 }
 
 pub struct Bitcask {
-    hashmap: HashMap<Key, Offset>,
-    store: Store,
     config: Config,
+    core: Arc<RwLock<Core>>,
 }
 
 impl Bitcask {
     pub fn new(config: Config) -> Self {
         Bitcask {
-            hashmap: HashMap::new(),
-            store: Store::new(&config.wal_path, 0),
+            core: Arc::new(RwLock::new(Core::new(&config.wal_path))),
             config,
         }
     }
 
     pub fn open(config: Config) -> Self {
-        let mut store = Store::open(&config.wal_path);
-        let hashmap = store.build_hashmap().expect("build hashmap from segment files");
         Bitcask {
+            core: Arc::new(RwLock::new(Core::open(&config.wal_path))),
+            config,
+        }
+    }
+
+    pub fn get(&self, key: Key) -> Result<Option<Value>> {
+        match self.core.read() {
+            Ok(core) => core.get(key),
+            Err(_) => Err(err_msg("lock get"))
+        }
+    }
+
+    pub fn set(&mut self, key: Key, value: Value) -> Result<()> {
+        match self.core.write() {
+            Ok(mut core) => core.set(key, value),
+            Err(_) => Err(err_msg("lock set"))
+        }
+    }
+
+    pub fn delete(&mut self, key: Key) -> Result<()> {
+        match self.core.write() {
+            Ok(mut core) => core.delete(key),
+            Err(_) => Err(err_msg("lock delete"))
+        }
+    }
+
+    pub fn exists(&self, key: Key) -> Result<bool> {
+        match self.core.read() {
+            Ok(core) => core.exists(key),
+            Err(_) => Err(err_msg("lock read"))
+        }
+    }
+
+    pub fn compact(&mut self) -> Result<()> {
+        match self.core.write() {
+            Ok(mut core) => {
+                core.compact()
+            },
+            Err(_) => Err(err_msg("lock compact"))
+        }
+    }
+}
+
+impl Clone for Bitcask {
+    fn clone(&self) -> Self {
+        Bitcask {
+            config: self.config.clone(),
+            core: self.core.clone()
+        }
+    }
+}
+
+
+pub struct Core {
+    hashmap: HashMap<Key, Offset>,
+    store: Store,
+}
+
+impl Core {
+    pub fn new(path: &PathBuf) -> Self {
+        Core {
+            hashmap: HashMap::new(),
+            store: Store::new(path, 0),
+        }
+    }
+
+    pub fn open(path: &PathBuf) -> Self {
+        let store = Store::open(path);
+        let hashmap = store.build_hashmap().expect("build hashmap from segment files");
+        Core {
             hashmap,
             store,
-            config,
         }
     }
 

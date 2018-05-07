@@ -4,9 +4,12 @@ extern crate log;
 extern crate simple_logger;
 
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 #[test]
 fn it_set_a_and_get_a() {
+    simple_logger::init();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     let key = "1111";
@@ -34,6 +37,7 @@ fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
 
 #[test]
 fn it_should_compact() {
+    simple_logger::init();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store2")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     populate_store(100, &mut bitcask);
@@ -48,7 +52,7 @@ fn it_should_compact() {
 
 #[test]
 fn it_should_build_from_segment_file() {
-    simple_logger::init().unwrap();
+    simple_logger::init();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store3")).build().unwrap();
     {
         let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
@@ -56,7 +60,34 @@ fn it_should_build_from_segment_file() {
         populate_store(50, &mut bitcask);
     }
 
-    let mut bitcask = bitcask_rs::Bitcask::open(config);
+    let bitcask = bitcask_rs::Bitcask::open(config);
     let ret = bitcask.get("1".to_string());
     assert_eq!(ret.expect("u1").expect("u2"), vec![1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn it_should_access_from_multiple_thread() {
+    simple_logger::init();
+    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store4")).build().unwrap();
+    let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
+    populate_store(100, &mut bitcask);
+    populate_store(50, &mut bitcask);
+
+    let bitcask_n = bitcask.clone();
+    let handler = thread::spawn(move || {
+//        thread::sleep(Duration::from_secs(1));
+        bitcask_n.get("1".to_string())
+    });
+
+    let mut bitcask_n = bitcask.clone();
+    let handler2 = thread::spawn(move || {
+        thread::sleep(Duration::from_secs(1));
+        bitcask_n.set("1".to_string(), vec![1, 3, 4])
+    });
+
+    let ret = bitcask.get("1".to_string());
+
+    let ret2 = handler.join().unwrap();
+    handler2.join();
+    assert_eq!(ret.expect("u1"), ret2.unwrap());
 }
