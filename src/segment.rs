@@ -3,6 +3,8 @@ use core::{Key, Result, TOMBSTONE, Value};
 use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
+use io_at::Cursor;
+
 
 pub type Offset = u64;
 pub type Size = u64;
@@ -35,6 +37,7 @@ impl Segment {
             size: 0,
         }
     }
+
     pub fn open(file_path: PathBuf) -> Self {
         let mut file = OpenOptions::new()
             .read(true)
@@ -54,20 +57,17 @@ impl Segment {
         }
     }
 
-    pub fn get(&mut self, offset: Offset) -> Result<Option<Value>> {
-        let read_offset = self.file.seek(SeekFrom::Start(offset))?;
-        debug!("get from offset {}", read_offset);
-        let size = self.file.read_u64::<BigEndian>()?;
+    pub fn get(&self, offset: Offset) -> Result<Option<Value>> {
+        let mut file = Cursor::new(&self.file, offset);
+        let size = file.read_u64::<BigEndian>()?;
         debug!("get key size {}", size);
-        debug!("current offset: {}", self.file.seek(SeekFrom::Current(0))?);
         let mut key_buf = vec![0; size as usize];
-        self.file.read_exact(&mut key_buf)?;
-        debug!("current offset: {}", self.file.seek(SeekFrom::Current(0))?);
+        file.read_exact(&mut key_buf)?;
         debug!("get key buf {:?}", key_buf);
-        let size = self.file.read_u64::<BigEndian>()?;
+        let size = file.read_u64::<BigEndian>()?;
         debug!("get value size {}", size);
         let mut value_buf = vec![0; size as usize];
-        self.file.read_exact(&mut value_buf)?;
+        file.read_exact(&mut value_buf)?;
         debug!("get value buf {:?}", value_buf);
         if value_buf == TOMBSTONE.as_bytes() {
             return Ok(None);
@@ -76,17 +76,18 @@ impl Segment {
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<Offset> {
-        let offset = self.file.seek(SeekFrom::End(0))?;
+        let offset = self.size;
+        let mut file = Cursor::new(&mut self.file, offset);
         let key_buf = key.as_bytes();
         debug!("insert key size {}", key_buf.len());
-        self.file.write_u64::<BigEndian>(key_buf.len() as u64)?;
+        file.write_u64::<BigEndian>(key_buf.len() as u64)?;
         debug!("insert key buf {:?}", key_buf);
-        self.file.write_all(key_buf)?;
+        file.write_all(key_buf)?;
         let value_buf = value.as_slice();
         debug!("insert value size {}", value_buf.len());
-        self.file.write_u64::<BigEndian>(value_buf.len() as u64)?;
+        file.write_u64::<BigEndian>(value_buf.len() as u64)?;
         debug!("insert value buf {:?}", value_buf);
-        self.file.write_all(value_buf)?;
+        file.write_all(value_buf)?;
         self.size += LENGTH_SIZE * 2 + key_buf.len() as u64 + value_buf.len() as u64;
         Ok(offset)
     }
@@ -103,27 +104,23 @@ impl Segment {
         self.begin_offset + self.file_size()
     }
 
-    pub fn iter(&mut self) -> SegmentIterator {
+    pub fn iter(&self) -> SegmentIterator {
         SegmentIterator::new(self)
     }
 }
 
 pub struct SegmentIterator<'a> {
-    segment: &'a mut Segment,
+    segment: &'a Segment,
     offset: u64,
     file_offset: u64,
 }
 
 impl<'a> SegmentIterator<'a> {
-    fn new(segment: &'a mut Segment) -> SegmentIterator<'a> {
-        let file_offset = segment
-            .file
-            .seek(SeekFrom::Start(0))
-            .expect("unable to seek to begin");
-        let offset = segment.file_begin_offset() + file_offset;
+    fn new(segment: &'a Segment) -> SegmentIterator<'a> {
+        let offset = segment.file_begin_offset();
         SegmentIterator {
             segment,
-            file_offset,
+            file_offset: 0,
             offset,
         }
     }
@@ -141,21 +138,17 @@ impl<'a> Iterator for SegmentIterator<'a> {
     type Item = Result<Entry>;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        let offset = self.segment
-            .file
-            .seek(SeekFrom::Current(0))
-            .expect("unable to seek to begin");
-        if offset + self.segment.file_begin_offset() >= self.segment.file_end_offset() {
+        if self.offset >= self.segment.file_end_offset() {
             return None;
         }
 
         debug!(
             "file path: {:?}, offset: {}, end offset: {}",
             &self.segment.file_path,
-            offset,
+            self.offset,
             self.segment.file_end_offset()
         );
-        let file = &mut self.segment.file;
+        let mut file = Cursor::new(&self.segment.file, self.file_offset);
         let key_size = file.read_u64::<BigEndian>().expect("read key size");
         debug!("read key size: {}", key_size);
         let mut key_buf = vec![0; key_size as usize];

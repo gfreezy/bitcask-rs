@@ -8,6 +8,7 @@ extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate simple_logger;
+extern crate io_at;
 
 pub use core::{Config, ConfigBuilder};
 pub use core::Bitcask;

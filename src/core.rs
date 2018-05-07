@@ -41,7 +41,7 @@ impl Bitcask {
         }
     }
 
-    pub fn get(&mut self, key: Key) -> Result<Option<Value>> {
+    pub fn get(&self, key: Key) -> Result<Option<Value>> {
         match self.hashmap.get(&key) {
             None => Ok(None),
             Some(offset) => {

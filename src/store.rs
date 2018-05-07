@@ -86,13 +86,13 @@ impl Store {
         self.add_segment(seg);
     }
 
-    pub fn get(&mut self, offset: Offset) -> Result<Option<Value>> {
+    pub fn get(&self, offset: Offset) -> Result<Option<Value>> {
         let index = match self.get_segment_index_by_offset(offset)? {
             Some(index) => index,
             None => return Ok(None)
         };
 
-        let segment = &mut self.segments[index];
+        let segment = &self.segments[index];
         segment.get(offset - segment.file_begin_offset())
     }
 
@@ -107,10 +107,10 @@ impl Store {
         Ok(inserted_offset + file_begin_offset)
     }
 
-    pub fn compact(&mut self, hashmap: &HashMap<Key, Offset>) -> Result<(Store, HashMap<Key, Offset>)> {
+    pub fn compact(&self, hashmap: &HashMap<Key, Offset>) -> Result<(Store, HashMap<Key, Offset>)> {
         let mut store = Store::new(&self.path, self.version + 1);
         let mut new_hashmap: HashMap<Key, Offset> = HashMap::with_capacity(hashmap.capacity());
-        for segment in &mut self.segments {
+        for segment in &self.segments {
             let file_end_offset = segment.file_end_offset();
             let file_begin_offset = segment.file_begin_offset();
 
@@ -130,9 +130,9 @@ impl Store {
         Ok((store, new_hashmap))
     }
 
-    pub fn build_hashmap(&mut self) -> Result<HashMap<Key, Offset>> {
+    pub fn build_hashmap(&self) -> Result<HashMap<Key, Offset>> {
         let mut new_hashmap: HashMap<Key, Offset> = HashMap::with_capacity(100);
-        for segment in &mut self.segments {
+        for segment in &self.segments {
             for entry_result in segment.iter() {
                 let entry = entry_result?;
                 new_hashmap.insert(entry.key.clone(), entry.offset);
