@@ -1,7 +1,6 @@
 extern crate bitcask_rs;
 extern crate failure;
 extern crate log;
-extern crate simple_logger;
 
 use std::path::PathBuf;
 use std::thread;
@@ -9,7 +8,7 @@ use std::time::Duration;
 
 #[test]
 fn it_set_a_and_get_a() {
-    let _ = simple_logger::init();
+    bitcask_rs::setup();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     let key = "1111";
@@ -37,7 +36,7 @@ fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
 
 #[test]
 fn it_should_compact() {
-    let _ = simple_logger::init();
+    bitcask_rs::setup();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store2")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     populate_store(100, &mut bitcask);
@@ -52,7 +51,7 @@ fn it_should_compact() {
 
 #[test]
 fn it_should_build_from_segment_file() {
-    let _ = simple_logger::init();
+    bitcask_rs::setup();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store3")).build().unwrap();
     {
         let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
@@ -67,7 +66,7 @@ fn it_should_build_from_segment_file() {
 
 #[test]
 fn it_should_access_from_multiple_thread() {
-    let _ = simple_logger::init();
+    bitcask_rs::setup();
     let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store4")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
     populate_store(100, &mut bitcask);

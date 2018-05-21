@@ -33,7 +33,7 @@ impl Segment {
             .open(&file_path)
             .expect("open segment file");
 
-        debug!(target: "bitcask.segment", "new segment file {:?}", &file_path);
+        debug!(target: "bitcask::segment", "new segment file {:?}", &file_path);
         Segment {
             file_id,
             file_path,
@@ -61,15 +61,15 @@ impl Segment {
     pub fn get(&self, offset: Offset) -> Result<Option<Value>> {
         let mut file = Cursor::new(self.file.as_ref().expect("get file"), offset);
         let size = file.read_u64::<BigEndian>()?;
-        debug!(target: "bitcask.segment", "get key size {}", size);
+        debug!(target: "bitcask::segment", "get key size {}", size);
         let mut key_buf = vec![0; size as usize];
         file.read_exact(&mut key_buf)?;
-        debug!(target: "bitcask.segment", "get key buf {:?}", key_buf);
+        debug!(target: "bitcask::segment", "get key buf {:?}", key_buf);
         let size = file.read_u64::<BigEndian>()?;
-        debug!(target: "bitcask.segment", "get value size {}", size);
+        debug!(target: "bitcask::segment", "get value size {}", size);
         let mut value_buf = vec![0; size as usize];
         file.read_exact(&mut value_buf)?;
-        debug!(target: "bitcask.segment", "get value buf {:?}", value_buf);
+        debug!(target: "bitcask::segment", "get value buf {:?}", value_buf);
         Ok(Some(value_buf))
     }
 
@@ -77,14 +77,14 @@ impl Segment {
         let offset = self.size;
         let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
         let key_buf = key.as_bytes();
-        debug!(target: "bitcask.segment", "insert key size {}", key_buf.len());
+        debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
         file.write_u64::<BigEndian>(key_buf.len() as u64)?;
-        debug!(target: "bitcask.segment", "insert key buf {:?}", key_buf);
+        debug!(target: "bitcask::segment", "insert key buf {:?}", key_buf);
         file.write_all(key_buf)?;
         let value_buf = value.as_slice();
-        debug!(target: "bitcask.segment", "insert value size {}", value_buf.len());
+        debug!(target: "bitcask::segment", "insert value size {}", value_buf.len());
         file.write_u64::<BigEndian>(value_buf.len() as u64)?;
-        debug!(target: "bitcask.segment", "insert value buf {:?}", value_buf);
+        debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
         file.write_all(value_buf)?;
         self.size += LENGTH_SIZE * 2 + key_buf.len() as u64 + value_buf.len() as u64;
         Ok(offset)
@@ -130,7 +130,7 @@ impl<'a> Iterator for SegmentIterator<'a> {
             return None;
         }
 
-        debug!(target: "bitcask.segment",
+        debug!(target: "bitcask::segment",
                "file path: {:?}, offset: {}, size: {}",
             &self.segment.file_path,
             self.offset,
@@ -138,16 +138,16 @@ impl<'a> Iterator for SegmentIterator<'a> {
         );
         let mut file = Cursor::new(self.segment.file.as_ref().expect("get file"), self.offset);
         let key_size = file.read_u64::<BigEndian>().expect("read key size");
-        debug!(target: "bitcask.segment", "read key size: {}", key_size);
+        debug!(target: "bitcask::segment", "read key size: {}", key_size);
         let mut key_buf = vec![0; key_size as usize];
         file.read_exact(&mut key_buf).expect("read key");
         let key = String::from_utf8(key_buf).unwrap();
-        debug!(target: "bitcask.segment", "read key: {:?}", &key);
+        debug!(target: "bitcask::segment", "read key: {:?}", &key);
         let value_size = file.read_u64::<BigEndian>().expect("read value size");
-        debug!(target: "bitcask.segment", "read value size: {:?}", value_size);
+        debug!(target: "bitcask::segment", "read value size: {:?}", value_size);
         let mut value_buf = vec![0; value_size as usize];
         file.read_exact(&mut value_buf).expect("read value");
-        debug!(target: "bitcask.segment", "read value: {:?}", &value_buf);
+        debug!(target: "bitcask::segment", "read value: {:?}", &value_buf);
 
         let entry = Entry {
             key,
