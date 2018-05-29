@@ -9,7 +9,7 @@ use std::time::Duration;
 #[test]
 fn it_set_a_and_get_a() {
     bitcask_rs::setup();
-    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     let key = "1111";
     let set_ret = bitcask.set(key.to_string(), vec![1, 2, 3]);
@@ -37,7 +37,7 @@ fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
 #[test]
 fn it_should_compact() {
     bitcask_rs::setup();
-    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store2")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store2")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
@@ -52,7 +52,7 @@ fn it_should_compact() {
 #[test]
 fn it_should_build_from_segment_file() {
     bitcask_rs::setup();
-    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store3")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store3")).build().unwrap();
     {
         let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
         populate_store(100, &mut bitcask);
@@ -67,14 +67,14 @@ fn it_should_build_from_segment_file() {
 #[test]
 fn it_should_access_from_multiple_thread() {
     bitcask_rs::setup();
-    let config = bitcask_rs::ConfigBuilder::default().wal_path(PathBuf::from("target/store4")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store4")).build().unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
 
     let bitcask_n = bitcask.clone();
     let handler = thread::spawn(move || {
-//        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(1));
         bitcask_n.get("1".to_string())
     });
 

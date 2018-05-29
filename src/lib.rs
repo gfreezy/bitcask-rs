@@ -19,7 +19,6 @@ mod segment;
 mod store;
 
 
-
 static INIT: Once = ONCE_INIT;
 
 /// Setup function that is only run once, even if called multiple times.

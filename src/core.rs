@@ -10,7 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default, Builder, Clone)]
 pub struct Config {
-    pub wal_path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub struct Bitcask {
@@ -21,14 +21,14 @@ pub struct Bitcask {
 impl Bitcask {
     pub fn new(config: Config) -> Self {
         Bitcask {
-            store: Arc::new(Store::new(&config.wal_path)),
+            store: Arc::new(Store::new(&config.path)),
             config: Arc::new(config),
         }
     }
 
     pub fn open(config: Config) -> Self {
         Bitcask {
-            store: Arc::new(Store::open(&config.wal_path)),
+            store: Arc::new(Store::open(&config.path)),
             config: Arc::new(config),
         }
     }

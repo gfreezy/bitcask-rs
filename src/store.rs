@@ -7,9 +7,10 @@ use std::mem;
 use std::sync::RwLock;
 
 const MAX_SIZE_PER_SEGMENT: u64 = 100;
-const MAX_FILE_ID: u64 = 100000;
-const MIN_MERGE_FILE_ID: u64 = 200000;
+const MAX_FILE_ID: u64 = 100_000;
+const MIN_MERGE_FILE_ID: u64 = 200_000;
 pub const TOMBSTONE: &str = "<<>>";
+
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
@@ -134,7 +135,7 @@ pub struct Store {
 
 impl Store {
     pub fn new(path: &PathBuf) -> Self {
-        let store = Store {
+        Store {
             path: path.clone(),
             next_file_id: RwLock::new(1),
             older_data: RwLock::new(OlderData {
@@ -147,9 +148,7 @@ impl Store {
                 pending_segments: HashMap::with_capacity(10),
                 pending_hashmap: HashMap::with_capacity(100),
             }),
-        };
-
-        store
+        }
     }
 
     pub fn open(path: &PathBuf) -> Self {
@@ -246,11 +245,12 @@ impl Store {
     }
 
     fn rename_segment(&self, from: u64, to: u64) -> Result<()> {
-        Ok(rename(Segment::get_path(from, &self.path), Segment::get_path(to, &self.path))?)
+        rename(Segment::get_path(from, &self.path), Segment::get_path(to, &self.path))?;
+        Ok(())
     }
 
     pub fn prepare_merging(&self) -> Vec<u64> {
-        self.older_data.read().expect("lock read").segments.keys().map(|s| *s).collect()
+        self.older_data.read().expect("lock read").segments.keys().cloned().map(|s| s).collect()
     }
 
     pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
@@ -309,7 +309,7 @@ impl Store {
             mapping.insert(*from_file_id, to_file_id);
             older_data.add_segment(Segment::open(to_file_id, &self.path));
         }
-        for (_, v) in hashmap.iter_mut() {
+        for v in hashmap.values_mut() {
             v.file_id = mapping[&v.file_id];
         }
 

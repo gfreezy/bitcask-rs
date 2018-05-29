@@ -157,6 +157,6 @@ impl<'a> Iterator for SegmentIterator<'a> {
 
         self.offset += LENGTH_SIZE * 2 + key_size + value_size;
 
-        return Some(Ok(entry));
+        Some(Ok(entry))
     }
 }
