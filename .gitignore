@@ -4,3 +4,4 @@
 .DS_Store
 
 bitcask-rs.iml
+*.log
