@@ -3,6 +3,8 @@ use std;
 use std::path::PathBuf;
 use store::Store;
 use std::sync::Arc;
+use keys_iterator::StoreKeys;
+
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -55,13 +57,17 @@ impl Bitcask {
         let ret = self.store.merge(file_ids)?;
         self.store.finish_merging(ret)
     }
+
+    pub fn keys<'a>(&'a self) -> StoreKeys<'a> {
+        self.store.keys()
+    }
 }
 
 impl Clone for Bitcask {
     fn clone(&self) -> Self {
         Bitcask {
             config: self.config.clone(),
-            store: self.store.clone()
+            store: self.store.clone(),
         }
     }
 }

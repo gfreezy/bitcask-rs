@@ -17,7 +17,10 @@ use std::sync::{Once, ONCE_INIT};
 mod core;
 mod segment;
 mod store;
+mod active_data;
+mod keys_iterator;
 
+pub use keys_iterator::StoreKeys;
 
 static INIT: Once = ONCE_INIT;
 

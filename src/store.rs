@@ -5,6 +5,8 @@ use std::fs::{read_dir, rename};
 use std::path::PathBuf;
 use std::mem;
 use std::sync::RwLock;
+use keys_iterator::StoreKeys;
+
 
 const MAX_SIZE_PER_SEGMENT: u64 = 100;
 const MAX_FILE_ID: u64 = 100_000;
@@ -33,7 +35,7 @@ pub struct MergeResult {
     to_remove_file_ids: Vec<u64>,
 }
 
-struct ActiveData {
+pub struct ActiveData {
     active_segment: Segment,
     active_hashmap: HashMap<Key, Position>,
     pending_segments: HashMap<u64, Segment>,
@@ -94,6 +96,10 @@ impl ActiveData {
             }
         })
     }
+
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+        Box::new(self.active_hashmap.keys().chain(self.pending_hashmap.keys()))
+    }
 }
 
 
@@ -121,6 +127,10 @@ impl OlderData {
             seg.destroy()?;
         }
         Ok(())
+    }
+
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+        Box::new(self.hashmap.keys())
     }
 }
 
@@ -247,6 +257,12 @@ impl Store {
     fn rename_segment(&self, from: u64, to: u64) -> Result<()> {
         rename(Segment::get_path(from, &self.path), Segment::get_path(to, &self.path))?;
         Ok(())
+    }
+
+    pub fn keys(&self) ->  StoreKeys {
+        StoreKeys {
+            guard: self.active_data.read().expect("lock read")
+        }
     }
 
     pub fn prepare_merging(&self) -> Vec<u64> {
