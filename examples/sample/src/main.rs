@@ -147,8 +147,9 @@ struct AppState {
 
 
 fn main() {
+    bitcask_rs::setup();
     let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store3")).build().unwrap();
-    let bitcask = bitcask_rs::Bitcask::new(config);
+    let bitcask = bitcask_rs::Bitcask::open(config);
     let sys = actix::System::new("hello-world");
 
     let addr = SyncArbiter::start(2, move || BitcaskActor(bitcask.clone()));

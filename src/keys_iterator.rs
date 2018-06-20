@@ -1,8 +1,9 @@
 use std::sync::RwLockReadGuard;
-use store::ActiveData;
+use store::{ActiveData, OlderData};
 
 pub struct StoreKeys<'a> {
-    pub guard: RwLockReadGuard<'a, ActiveData>
+    pub active_data_guard: RwLockReadGuard<'a, ActiveData>,
+    pub older_data_guard: RwLockReadGuard<'a, OlderData>,
 }
 
 
@@ -11,7 +12,7 @@ impl<'a> IntoIterator for &'a StoreKeys<'a> {
     type IntoIter = StoreKeysIter<'a>;
 
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        StoreKeysIter(self.guard.keys())
+        StoreKeysIter(Box::new(self.active_data_guard.keys().chain(self.older_data_guard.keys())))
     }
 }
 

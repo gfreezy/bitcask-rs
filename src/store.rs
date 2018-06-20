@@ -103,7 +103,7 @@ impl ActiveData {
 }
 
 
-struct OlderData {
+pub struct OlderData {
     segments: HashMap<u64, Segment>,
     hashmap: HashMap<Key, Position>,
 }
@@ -175,6 +175,7 @@ impl Store {
                 let entry = entry_result.expect("get entry");
                 hashmap.insert(entry.key.clone(), Position { file_id, offset: entry.offset });
             }
+            debug!(target: "bitcask::store::open", "add segment: {:?}", file_id);
             segments.insert(file_id, seg);
         };
         Store {
@@ -261,7 +262,8 @@ impl Store {
 
     pub fn keys(&self) ->  StoreKeys {
         StoreKeys {
-            guard: self.active_data.read().expect("lock read")
+            active_data_guard: self.active_data.read().expect("lock read"),
+            older_data_guard: self.older_data.read().expect("lock read"),
         }
     }
 
