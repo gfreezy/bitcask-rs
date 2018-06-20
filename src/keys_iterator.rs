@@ -1,4 +1,5 @@
 use std::sync::RwLockReadGuard;
+use std::collections::HashSet;
 use store::{ActiveData, OlderData};
 
 pub struct StoreKeys<'a> {
@@ -12,17 +13,42 @@ impl<'a> IntoIterator for &'a StoreKeys<'a> {
     type IntoIter = StoreKeysIter<'a>;
 
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        StoreKeysIter(Box::new(self.active_data_guard.keys().chain(self.older_data_guard.keys())))
+        StoreKeysIter::new(Box::new(self.active_data_guard.keys().chain(self.older_data_guard.keys())))
     }
 }
 
 
-pub struct StoreKeysIter<'a>(Box<Iterator<Item=&'a String> + 'a>);
+pub struct StoreKeysIter<'a> {
+    iter: Box<Iterator<Item=&'a String> + 'a>,
+    seen: HashSet<String>,
+}
+
+impl<'a> StoreKeysIter<'a> {
+    fn new(iter: Box<Iterator<Item=&'a String> + 'a>) -> StoreKeysIter<'a> {
+        StoreKeysIter {
+            iter,
+            seen: HashSet::new(),
+        }
+    }
+}
+
 
 impl<'a> Iterator for StoreKeysIter<'a> {
     type Item = &'a String;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        self.0.next()
+        loop {
+            let v = self.iter.next();
+            if v.is_none() {
+                return None
+            }
+            let i = v.unwrap();
+            if !self.seen.contains(i) {
+                self.seen.insert(i.clone());
+                return v;
+            } else {
+                continue;
+            }
+        }
     }
 }
