@@ -5,3 +5,4 @@
 
 bitcask-rs.iml
 *.log
+examples/sample/target
