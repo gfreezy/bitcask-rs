@@ -9,6 +9,8 @@ extern crate itertools;
 extern crate log;
 extern crate io_at;
 extern crate log4rs;
+extern crate integer_encoding;
+
 
 pub use core::{Config, ConfigBuilder};
 pub use core::Bitcask;
