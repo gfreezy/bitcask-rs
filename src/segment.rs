@@ -1,14 +1,47 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use core::{Key, Result, Value};
 use std::fs::{create_dir_all, File, OpenOptions, remove_file};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write, BufRead};
 use std::path::PathBuf;
 use io_at::Cursor;
-
+use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
 
 pub type Offset = u64;
 
 const LENGTH_SIZE: u64 = 8;
+
+
+struct SegmentEntry {
+    key: Key,
+    value: Value,
+    key_length: usize,
+    value_length: usize,
+    key_size: u64,
+    value_size: u64,
+}
+
+
+fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
+    let key_size = file.read_varint::<u64>()?;
+    debug!(target: "bitcask::segment", "get key size {}", key_size);
+    let mut key_buf = vec![0; key_size as usize];
+    file.read_exact(&mut key_buf)?;
+    debug!(target: "bitcask::segment", "get key buf {:?}", key_buf);
+    let value_size = file.read_varint::<u64>()?;
+    debug!(target: "bitcask::segment", "get value size {}", value_size);
+    let mut value_buf = vec![0; value_size as usize];
+    file.read_exact(&mut value_buf)?;
+    debug!(target: "bitcask::segment", "get value buf {:?}", value_buf);
+    Ok(SegmentEntry {
+        key: String::from_utf8_lossy(&key_buf).to_string(),
+        value: value_buf,
+        key_length: key_size.required_space(),
+        value_length: value_size.required_space(),
+        key_size: key_size,
+        value_size: value_size,
+    })
+}
+
 
 pub struct Segment {
     file_path: PathBuf,
@@ -60,17 +93,7 @@ impl Segment {
 
     pub fn get(&self, offset: Offset) -> Result<Option<Value>> {
         let mut file = Cursor::new(self.file.as_ref().expect("get file"), offset);
-        let size = file.read_u64::<BigEndian>()?;
-        debug!(target: "bitcask::segment", "get key size {}", size);
-        let mut key_buf = vec![0; size as usize];
-        file.read_exact(&mut key_buf)?;
-        debug!(target: "bitcask::segment", "get key buf {:?}", key_buf);
-        let size = file.read_u64::<BigEndian>()?;
-        debug!(target: "bitcask::segment", "get value size {}", size);
-        let mut value_buf = vec![0; size as usize];
-        file.read_exact(&mut value_buf)?;
-        debug!(target: "bitcask::segment", "get value buf {:?}", value_buf);
-        Ok(Some(value_buf))
+        Ok(Some(read_from_cursor(&mut file)?.value))
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<Offset> {
@@ -78,12 +101,12 @@ impl Segment {
         let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
         let key_buf = key.as_bytes();
         debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
-        file.write_u64::<BigEndian>(key_buf.len() as u64)?;
+        let _ = file.write_varint(key_buf.len() as u64)?;
         debug!(target: "bitcask::segment", "insert key buf {:?}", key_buf);
         file.write_all(key_buf)?;
         let value_buf = value.as_slice();
         debug!(target: "bitcask::segment", "insert value size {}", value_buf.len());
-        file.write_u64::<BigEndian>(value_buf.len() as u64)?;
+        let _ = file.write_varint(value_buf.len() as u64)?;
         debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
         file.write_all(value_buf)?;
         self.size += LENGTH_SIZE * 2 + key_buf.len() as u64 + value_buf.len() as u64;
@@ -137,25 +160,15 @@ impl<'a> Iterator for SegmentIterator<'a> {
             self.segment.size
         );
         let mut file = Cursor::new(self.segment.file.as_ref().expect("get file"), self.offset);
-        let key_size = file.read_u64::<BigEndian>().expect("read key size");
-        debug!(target: "bitcask::segment", "read key size: {}", key_size);
-        let mut key_buf = vec![0; key_size as usize];
-        file.read_exact(&mut key_buf).expect("read key");
-        let key = String::from_utf8(key_buf).unwrap();
-        debug!(target: "bitcask::segment", "read key: {:?}", &key);
-        let value_size = file.read_u64::<BigEndian>().expect("read value size");
-        debug!(target: "bitcask::segment", "read value size: {:?}", value_size);
-        let mut value_buf = vec![0; value_size as usize];
-        file.read_exact(&mut value_buf).expect("read value");
-        debug!(target: "bitcask::segment", "read value: {:?}", &value_buf);
+        let segment_entry = read_from_cursor(&mut file).expect("read from cursor");
 
         let entry = Entry {
-            key,
-            value: value_buf,
+            key: segment_entry.key,
+            value: segment_entry.value,
             offset: self.offset,
         };
 
-        self.offset += LENGTH_SIZE * 2 + key_size + value_size;
+        self.offset += segment_entry.key_length as u64 + segment_entry.value_length as u64 + segment_entry.key_size + segment_entry.value_size;
 
         Some(Ok(entry))
     }

@@ -16,4 +16,3 @@ loggers:
   # Raise the maximum log level for events sent to the "app::backend::db" logger to "info"
   bitcask::segment:
     level: warn
-    additive: false
