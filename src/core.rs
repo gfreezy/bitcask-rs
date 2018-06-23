@@ -51,8 +51,12 @@ impl Bitcask {
         self.store.exists(key)
     }
 
-    pub fn merge(&mut self) -> Result<()> {
-        let file_ids = self.store.prepare_merging();
+    pub fn merge(&mut self, since: Option<u64>) -> Result<()> {
+        let file_ids = if let Some(file_id) = since {
+            self.store.prepare_merging_since(file_id)
+        } else {
+            self.store.prepare_full_merging()
+        };
         debug!(target: "core::merge", "file_ids: {:?}", file_ids);
         let ret = self.store.merge(file_ids)?;
         self.store.finish_merging(ret)

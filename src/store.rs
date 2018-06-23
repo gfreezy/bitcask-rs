@@ -267,12 +267,18 @@ impl Store {
         }
     }
 
-    pub fn prepare_merging(&self) -> Vec<u64> {
+    pub fn prepare_full_merging(&self) -> Vec<u64> {
         self.older_data.read().expect("lock read").segments.keys().cloned().map(|s| s).collect()
     }
 
+    pub fn prepare_merging_since(&self, file_id: u64) -> Vec<u64> {
+        self.older_data.read().expect("lock read").segments.keys().cloned().map(|s| s).filter(|s| *s >= file_id).collect()
+    }
+
     pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
-        let hashmap = &self.older_data.read().expect("lock read").hashmap;
+        // todo: check file ids are continued
+        let older_data = self.older_data.read().expect("lock read");
+        let hashmap = &older_data.hashmap;
         let mut new_hashmap: HashMap<Key, Position> = HashMap::with_capacity(hashmap.capacity());
         let mut next_file_id = MIN_MERGE_FILE_ID;
         let mut new_file_ids = vec![next_file_id];
@@ -288,14 +294,13 @@ impl Store {
                     None => continue,
                     Some(&pos) => {
                         if segment.file_id == pos.file_id && entry.offset == pos.offset {
-                            let offset = new_segment.insert(entry.key.clone(), entry.value)?;
-                            new_hashmap.insert(entry.key, Position { file_id: new_segment.file_id, offset });
-
                             if new_segment.size >= MAX_SIZE_PER_SEGMENT {
                                 new_file_ids.push(next_file_id);
                                 new_segment = Segment::new(next_file_id, &self.path);
                                 next_file_id += 1;
                             }
+                            let offset = new_segment.insert(entry.key.clone(), entry.value)?;
+                            new_hashmap.insert(entry.key, Position { file_id: new_segment.file_id, offset });
                         }
                     }
                 }
@@ -311,6 +316,7 @@ impl Store {
     }
 
     pub fn finish_merging(&self, mut merge_result: MergeResult) -> Result<()> {
+        debug!(target: "bitcask::store::finish_merging", "new_file_ids: {:?}, to_remove_file_ids: {:?}", merge_result.new_file_ids, merge_result.to_remove_file_ids);
         assert!(merge_result.new_file_ids.len() <= merge_result.to_remove_file_ids.len());
 
         let mut older_data = self.older_data.write().expect("lock write");
@@ -335,4 +341,3 @@ impl Store {
         Ok(())
     }
 }
-

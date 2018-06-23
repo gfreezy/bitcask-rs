@@ -1,7 +1,6 @@
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use core::{Key, Result, Value};
 use std::fs::{create_dir_all, File, OpenOptions, remove_file};
-use std::io::{Read, Seek, SeekFrom, Write, BufRead};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use io_at::Cursor;
 use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
