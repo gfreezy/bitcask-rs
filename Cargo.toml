@@ -6,7 +6,6 @@ authors = ["gfreezy <gfreezy@gmail.com>"]
 [dependencies]
 failure = "0.1.1"
 derive_builder = "0.5.1"
-byteorder = "1"
 log = "0.4"
 itertools = "0.7.8"
 io-at = "0.4.1"

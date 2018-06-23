@@ -155,7 +155,6 @@ dependencies = [
 name = "bitcask-rs"
 version = "0.1.0"
 dependencies = [
- "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_builder 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "integer-encoding 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",

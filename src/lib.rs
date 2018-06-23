@@ -1,6 +1,5 @@
 #![feature(nll)]
 
-extern crate byteorder;
 #[macro_use]
 extern crate derive_builder;
 extern crate failure;
