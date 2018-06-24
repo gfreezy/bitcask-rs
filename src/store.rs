@@ -1,18 +1,13 @@
-use ::core::{Key, Result, Value};
+use ::core::{Key, Result, Value, Config};
 use ::segment::{Offset, Segment};
 use std::collections::HashMap;
 use std::fs::{read_dir, rename};
 use std::path::PathBuf;
 use std::mem;
-use std::sync::RwLock;
+use std::sync::{RwLock, Arc};
 use keys_iterator::StoreKeys;
 
-
-const MAX_SIZE_PER_SEGMENT: u64 = 100;
-const MAX_FILE_ID: u64 = 100_000;
-const MIN_MERGE_FILE_ID: u64 = 200_000;
 pub const TOMBSTONE: &str = "<<>>";
-
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
@@ -29,6 +24,7 @@ impl Position {
     }
 }
 
+#[derive(Default)]
 pub struct MergeResult {
     merged_hashmap: HashMap<Key, Position>,
     new_file_ids: Vec<u64>,
@@ -40,6 +36,7 @@ pub struct ActiveData {
     active_hashmap: HashMap<Key, Position>,
     pending_segments: HashMap<u64, Segment>,
     pending_hashmap: HashMap<Key, Position>,
+    config: Arc<Config>,
 }
 
 impl ActiveData {
@@ -61,7 +58,7 @@ impl ActiveData {
         let active_hashmap = &mut self.active_hashmap;
         active_hashmap.insert(key, Position { offset, file_id });
 
-        Ok(active_segment.size >= MAX_SIZE_PER_SEGMENT)
+        Ok(active_segment.size >= self.config.max_size_per_segment)
     }
 
     pub fn rotate(&mut self, mut segment: Segment) {
@@ -106,6 +103,7 @@ impl ActiveData {
 pub struct OlderData {
     segments: HashMap<u64, Segment>,
     hashmap: HashMap<Key, Position>,
+    config: Arc<Config>,
 }
 
 
@@ -140,28 +138,34 @@ pub struct Store {
     next_file_id: RwLock<u64>,
     older_data: RwLock<OlderData>,
     active_data: RwLock<ActiveData>,
+    config: Arc<Config>,
 }
 
 
 impl Store {
-    pub fn new(path: &PathBuf) -> Self {
+    pub fn new(config: Arc<Config>) -> Self {
+        let path = &config.path;
         Store {
-            path: path.clone(),
+            path: config.path.clone(),
             next_file_id: RwLock::new(1),
             older_data: RwLock::new(OlderData {
                 segments: HashMap::new(),
                 hashmap: HashMap::new(),
+                config: config.clone(),
             }),
             active_data: RwLock::new(ActiveData {
                 active_segment: Segment::new(0, path),
                 active_hashmap: HashMap::with_capacity(100),
                 pending_segments: HashMap::with_capacity(10),
                 pending_hashmap: HashMap::with_capacity(100),
+                config: config.clone(),
             }),
+            config: config.clone(),
         }
     }
 
-    pub fn open(path: &PathBuf) -> Self {
+    pub fn open(config: Arc<Config>) -> Self {
+        let path = &config.path;
         let mut hashmap = HashMap::with_capacity(100);
         let mut segments = HashMap::with_capacity(100);
         let mut max_file_id = 0;
@@ -184,13 +188,16 @@ impl Store {
             older_data: RwLock::new(OlderData {
                 segments,
                 hashmap,
+                config: config.clone(),
             }),
             active_data: RwLock::new(ActiveData {
                 active_segment: Segment::new(max_file_id + 1, path),
                 active_hashmap: HashMap::with_capacity(100),
                 pending_segments: HashMap::with_capacity(10),
                 pending_hashmap: HashMap::with_capacity(100),
+                config: config.clone(),
             }),
+            config: config.clone(),
         }
     }
 
@@ -222,7 +229,7 @@ impl Store {
             let file_id = *next_file_id;
             *next_file_id += 1;
             active_data.rotate(Segment::new(file_id, &self.path));
-            assert!(file_id < MAX_FILE_ID);
+            assert!(file_id < self.config.max_file_id);
         }
 
         if !active_data.pending_hashmap.is_empty() {
@@ -276,11 +283,15 @@ impl Store {
     }
 
     pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
+        if file_ids.is_empty() {
+            return Ok(MergeResult::default())
+        }
         // todo: check file ids are continued
         let older_data = self.older_data.read().expect("lock read");
         let hashmap = &older_data.hashmap;
         let mut new_hashmap: HashMap<Key, Position> = HashMap::with_capacity(hashmap.capacity());
-        let mut next_file_id = MIN_MERGE_FILE_ID;
+        let mut next_file_id = self.config.min_merge_file_id;
+
         let mut new_file_ids = vec![next_file_id];
         let mut to_remove_file_ids = vec![];
         let mut new_segment = Segment::new(next_file_id, &self.path);
@@ -294,7 +305,7 @@ impl Store {
                     None => continue,
                     Some(&pos) => {
                         if segment.file_id == pos.file_id && entry.offset == pos.offset {
-                            if new_segment.size >= MAX_SIZE_PER_SEGMENT {
+                            if new_segment.size >= self.config.max_size_per_segment {
                                 new_file_ids.push(next_file_id);
                                 new_segment = Segment::new(next_file_id, &self.path);
                                 next_file_id += 1;

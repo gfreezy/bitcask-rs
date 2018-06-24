@@ -10,10 +10,26 @@ pub type Key = String;
 pub type Value = Vec<u8>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Default, Builder, Clone)]
+#[derive(Builder, Clone)]
+#[builder(default)]
 pub struct Config {
     pub path: PathBuf,
+    pub max_size_per_segment: u64,
+    pub max_file_id: u64,
+    pub min_merge_file_id: u64,
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            path: std::env::current_dir().expect("get current dir"),
+            max_size_per_segment: 100_000_000,
+            max_file_id: 1_000_000_000,
+            min_merge_file_id: 100_000_000_000,
+        }
+    }
+}
+
 
 pub struct Bitcask {
     config: Arc<Config>,
@@ -22,16 +38,18 @@ pub struct Bitcask {
 
 impl Bitcask {
     pub fn new(config: Config) -> Self {
+        let arc_config = Arc::new(config);
         Bitcask {
-            store: Arc::new(Store::new(&config.path)),
-            config: Arc::new(config),
+            store: Arc::new(Store::new(arc_config.clone())),
+            config: arc_config,
         }
     }
 
     pub fn open(config: Config) -> Self {
+        let arc_config = Arc::new(config);
         Bitcask {
-            store: Arc::new(Store::open(&config.path)),
-            config: Arc::new(config),
+            store: Arc::new(Store::open(arc_config.clone())),
+            config: arc_config,
         }
     }
 
