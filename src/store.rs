@@ -1,5 +1,6 @@
 use ::core::{Key, Result, Value, Config};
 use ::segment::{Offset, Segment};
+use ::hint::Hint;
 use std::collections::HashMap;
 use std::fs::{read_dir, rename};
 use std::path::PathBuf;
@@ -33,8 +34,10 @@ pub struct MergeResult {
 
 pub struct ActiveData {
     active_segment: Segment,
+    active_hint: Hint,
     active_hashmap: HashMap<Key, Position>,
     pending_segments: HashMap<u64, Segment>,
+    pending_hints: HashMap<u64, Hint>,
     pending_hashmap: HashMap<Key, Position>,
     config: Arc<Config>,
 }
@@ -46,40 +49,39 @@ impl ActiveData {
         }
 
         if let Some(pos) = self.pending_hashmap.get(&key) {
-            return self.pending_segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset))
+            return self.pending_segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset));
         }
         Ok(None)
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<bool> {
         let active_segment = &mut self.active_segment;
-        let offset = active_segment.insert(key.clone(), value)?;
+        let offset = active_segment.insert(key.clone(), value.clone())?;
         let file_id = active_segment.file_id;
+        let position = Position { offset, file_id };
+        self.active_hint.insert(key.clone(), position);
         let active_hashmap = &mut self.active_hashmap;
-        active_hashmap.insert(key, Position { offset, file_id });
+        active_hashmap.insert(key, position);
 
         Ok(active_segment.size >= self.config.max_size_per_segment)
     }
 
-    pub fn rotate(&mut self, mut segment: Segment) {
+    pub fn rotate(&mut self, mut segment: Segment, mut hint: Hint) {
         let mut new_active_hashmap = HashMap::with_capacity(100);
         mem::swap(&mut new_active_hashmap, &mut self.active_hashmap);
         self.pending_hashmap.extend(new_active_hashmap);
 
+        assert_eq!(segment.file_id, hint.file_id);
+
         mem::swap(&mut self.active_segment, &mut segment);
         self.pending_segments.insert(segment.file_id, segment);
+
+        mem::swap(&mut self.active_hint, &mut hint);
+        self.pending_hints.insert(hint.file_id, hint);
     }
 
-    pub fn delete(&mut self, key: Key) -> Result<()> {
-        let hashmap = &mut self.active_hashmap;
-        match hashmap.get(&key) {
-            Some(_) => {
-                hashmap.insert(key.clone(), Position::not_exist());
-                self.active_segment.insert(key, TOMBSTONE.as_bytes().to_vec())?;
-                Ok(())
-            }
-            None => Ok(()),
-        }
+    pub fn delete(&mut self, key: Key) -> Result<bool> {
+        self.insert(key, TOMBSTONE.as_bytes().to_vec())
     }
 
     pub fn exists(&self, key: Key) -> Result<bool> {
@@ -94,7 +96,7 @@ impl ActiveData {
         })
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
         Box::new(self.active_hashmap.keys().chain(self.pending_hashmap.keys()))
     }
 }
@@ -102,6 +104,7 @@ impl ActiveData {
 
 pub struct OlderData {
     segments: HashMap<u64, Segment>,
+    hints: HashMap<u64, Hint>,
     hashmap: HashMap<Key, Position>,
     config: Arc<Config>,
 }
@@ -110,13 +113,15 @@ pub struct OlderData {
 impl OlderData {
     pub fn get(&self, key: Key) -> Result<Option<Value>> {
         if let Some(pos) = self.hashmap.get(&key) {
-            return self.segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset))
+            return self.segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset));
         }
         Ok(None)
     }
 
-    pub fn add_segment(&mut self, segment: Segment) {
+    pub fn add_segment(&mut self, segment: Segment, hint: Hint) {
+        assert_eq!(segment.file_id, hint.file_id);
         self.segments.insert(segment.file_id, segment);
+        self.hints.insert(hint.file_id, hint);
     }
 
     fn remove_segment(&mut self, file_id: u64) -> Result<()> {
@@ -124,10 +129,14 @@ impl OlderData {
         if let Some(mut seg) = seg {
             seg.destroy()?;
         }
+        let hint = self.hints.remove(&file_id);
+        if let Some(mut h) = hint {
+            h.destroy()?;
+        }
         Ok(())
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
         Box::new(self.hashmap.keys())
     }
 }
@@ -150,13 +159,16 @@ impl Store {
             next_file_id: RwLock::new(1),
             older_data: RwLock::new(OlderData {
                 segments: HashMap::new(),
+                hints: HashMap::new(),
                 hashmap: HashMap::new(),
                 config: config.clone(),
             }),
             active_data: RwLock::new(ActiveData {
                 active_segment: Segment::new(0, path),
+                active_hint: Hint::new(0, path),
                 active_hashmap: HashMap::with_capacity(100),
                 pending_segments: HashMap::with_capacity(10),
+                pending_hints: HashMap::with_capacity(100),
                 pending_hashmap: HashMap::with_capacity(100),
                 config: config.clone(),
             }),
@@ -168,32 +180,56 @@ impl Store {
         let path = &config.path;
         let mut hashmap = HashMap::with_capacity(100);
         let mut segments = HashMap::with_capacity(100);
+        let mut hints = HashMap::with_capacity(100);
         let mut max_file_id = 0;
         for entry in read_dir(path).expect("read segments dir") {
             let entry = entry.expect("read path entry");
             let segment_path = entry.path();
+            if segment_path.extension().expect("get extension").to_string_lossy() != "data" {
+                continue;
+            }
             let file_id = segment_path.file_stem().expect("get file id").to_str().expect("to string").parse::<u64>().expect("parse int");
             max_file_id = max_file_id.max(file_id);
             let seg = Segment::open(file_id, path);
-            for entry_result in seg.iter() {
-                let entry = entry_result.expect("get entry");
-                hashmap.insert(entry.key.clone(), Position { file_id, offset: entry.offset });
+            let mut hint = Hint::open(file_id, path);
+            match hint {
+                Ok(ref hint) => {
+                    for entry_result in hint {
+                        let entry = entry_result.expect("get hint entry");
+                        hashmap.insert(entry.key.clone(), entry.position);
+                    }
+                }
+                Err(_) => {
+                    let mut h = Hint::new(file_id, path);
+                    for entry_result in &seg {
+                        let entry = entry_result.expect("get entry");
+                        let pos = Position { file_id, offset: entry.offset };
+                        hashmap.insert(entry.key.clone(), pos);
+                        h.insert(entry.key.clone(), pos);
+                    }
+                    hint = Ok(h);
+                }
             }
+
             debug!(target: "bitcask::store::open", "add segment: {:?}", file_id);
             segments.insert(file_id, seg);
+            hints.insert(file_id, hint.unwrap());
         };
         Store {
             path: path.clone(),
             next_file_id: RwLock::new(max_file_id + 2),
             older_data: RwLock::new(OlderData {
                 segments,
+                hints,
                 hashmap,
                 config: config.clone(),
             }),
             active_data: RwLock::new(ActiveData {
                 active_segment: Segment::new(max_file_id + 1, path),
+                active_hint: Hint::new(max_file_id + 1, path),
                 active_hashmap: HashMap::with_capacity(100),
                 pending_segments: HashMap::with_capacity(10),
+                pending_hints: HashMap::with_capacity(10),
                 pending_hashmap: HashMap::with_capacity(100),
                 config: config.clone(),
             }),
@@ -228,18 +264,23 @@ impl Store {
             let mut next_file_id = self.next_file_id.write().expect("lock write");
             let file_id = *next_file_id;
             *next_file_id += 1;
-            active_data.rotate(Segment::new(file_id, &self.path));
+            active_data.rotate(Segment::new(file_id, &self.path), Hint::new(file_id, &self.path));
             assert!(file_id < self.config.max_file_id);
         }
 
         if !active_data.pending_hashmap.is_empty() {
+            assert!(!active_data.pending_hints.is_empty());
+
             if let Ok(mut older_data) = self.older_data.try_write() {
                 let mut pending_segments = HashMap::new();
+                let mut pending_hints = HashMap::new();
                 let mut pending_hashmap = HashMap::new();
                 mem::swap(&mut active_data.pending_segments, &mut pending_segments);
+                mem::swap(&mut active_data.pending_hints, &mut pending_hints);
                 mem::swap(&mut active_data.pending_hashmap, &mut pending_hashmap);
 
                 older_data.segments.extend(pending_segments);
+                older_data.hints.extend(pending_hints);
                 older_data.hashmap.extend(pending_hashmap);
             }
         }
@@ -264,10 +305,11 @@ impl Store {
 
     fn rename_segment(&self, from: u64, to: u64) -> Result<()> {
         rename(Segment::get_path(from, &self.path), Segment::get_path(to, &self.path))?;
+        rename(Hint::get_path(from, &self.path), Hint::get_path(to, &self.path))?;
         Ok(())
     }
 
-    pub fn keys(&self) ->  StoreKeys {
+    pub fn keys(&self) -> StoreKeys {
         StoreKeys {
             active_data_guard: self.active_data.read().expect("lock read"),
             older_data_guard: self.older_data.read().expect("lock read"),
@@ -284,7 +326,7 @@ impl Store {
 
     pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
         if file_ids.is_empty() {
-            return Ok(MergeResult::default())
+            return Ok(MergeResult::default());
         }
         // todo: check file ids are continued
         let older_data = self.older_data.read().expect("lock read");
@@ -295,6 +337,7 @@ impl Store {
         let mut new_file_ids = vec![next_file_id];
         let mut to_remove_file_ids = vec![];
         let mut new_segment = Segment::new(next_file_id, &self.path);
+        let mut new_hint = Hint::new(next_file_id, &self.path);
         next_file_id += 1;
 
         for file_id in &file_ids {
@@ -308,10 +351,13 @@ impl Store {
                             if new_segment.size >= self.config.max_size_per_segment {
                                 new_file_ids.push(next_file_id);
                                 new_segment = Segment::new(next_file_id, &self.path);
+                                new_hint = Hint::new(next_file_id, &self.path);
                                 next_file_id += 1;
                             }
                             let offset = new_segment.insert(entry.key.clone(), entry.value)?;
-                            new_hashmap.insert(entry.key, Position { file_id: new_segment.file_id, offset });
+                            let pos = Position { file_id: new_segment.file_id, offset };
+                            new_hint.insert(entry.key.clone(), pos)?;
+                            new_hashmap.insert(entry.key, pos);
                         }
                     }
                 }
@@ -342,7 +388,7 @@ impl Store {
             let to_file_id = merge_result.to_remove_file_ids[i];
             self.rename_segment(*from_file_id, to_file_id)?;
             mapping.insert(*from_file_id, to_file_id);
-            older_data.add_segment(Segment::open(to_file_id, &self.path));
+            older_data.add_segment(Segment::open(to_file_id, &self.path), Hint::open(to_file_id, &self.path)?);
         }
         for v in hashmap.values_mut() {
             v.file_id = mapping[&v.file_id];

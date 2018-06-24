@@ -20,6 +20,7 @@ mod segment;
 mod store;
 mod active_data;
 mod keys_iterator;
+mod hint;
 
 pub use keys_iterator::StoreKeys;
 

@@ -88,10 +88,11 @@ fn it_should_access_from_multiple_thread() {
     let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
+    bitcask.set("1".to_string(), vec![1, 3, 4]);
 
     let bitcask_n = bitcask.clone();
     let handler = thread::spawn(move || {
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(2));
         bitcask_n.get("1".to_string())
     });
 

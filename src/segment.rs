@@ -125,6 +125,15 @@ pub struct SegmentIterator<'a> {
     offset: u64,
 }
 
+impl<'a> IntoIterator for &'a Segment {
+    type Item = Result<Entry>;
+    type IntoIter = SegmentIterator<'a>;
+
+    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
+        SegmentIterator::new(self)
+    }
+}
+
 impl<'a> SegmentIterator<'a> {
     fn new(segment: &'a Segment) -> SegmentIterator<'a> {
         SegmentIterator {
