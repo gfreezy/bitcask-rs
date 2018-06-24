@@ -13,7 +13,8 @@ fn setup_test() -> Result<(), failure::Error> {
     bitcask_rs::setup();
     for entry in fs::read_dir("target")? {
         let entry = entry?;
-        if entry.path().starts_with("target/store") {
+
+        if entry.path().to_string_lossy().starts_with("target/store") {
             fs::remove_dir_all(entry.path())?;
             debug!("rmdir {:?}", entry.path());
         }
