@@ -7,9 +7,6 @@ use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
 
 pub type Offset = u64;
 
-const LENGTH_SIZE: u64 = 8;
-
-
 struct SegmentEntry {
     key: Key,
     value: Value,
@@ -100,15 +97,15 @@ impl Segment {
         let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
         let key_buf = key.as_bytes();
         debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
-        let _ = file.write_varint(key_buf.len() as u64)?;
+        let key_size_length = file.write_varint(key_buf.len() as u64)?;
         debug!(target: "bitcask::segment", "insert key buf {:?}", key_buf);
         file.write_all(key_buf)?;
         let value_buf = value.as_slice();
         debug!(target: "bitcask::segment", "insert value size {}", value_buf.len());
-        let _ = file.write_varint(value_buf.len() as u64)?;
+        let value_size_length = file.write_varint(value_buf.len() as u64)?;
         debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
         file.write_all(value_buf)?;
-        self.size += LENGTH_SIZE * 2 + key_buf.len() as u64 + value_buf.len() as u64;
+        self.size += key_size_length as u64 + value_size_length as u64 + key_buf.len() as u64 + value_buf.len() as u64;
         Ok(offset)
     }
 
