@@ -391,7 +391,7 @@ impl Store {
             .collect()
     }
 
-    pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
+    pub fn merge(&self, file_ids: &[u64]) -> Result<MergeResult> {
         if file_ids.is_empty() {
             return Ok(MergeResult::default());
         }
@@ -407,7 +407,7 @@ impl Store {
         let mut new_hint = Hint::new(next_file_id, &self.path);
         next_file_id += 1;
 
-        for file_id in &file_ids {
+        for file_id in file_ids {
             let segment = Segment::open(*file_id, &self.path);
             for kv_result in segment.iter() {
                 let entry = kv_result?;

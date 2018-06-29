@@ -74,7 +74,7 @@ impl Bitcask {
             self.store.prepare_full_merging()
         };
         debug!(target: "core::merge", "file_ids: {:?}", file_ids);
-        let ret = self.store.merge(file_ids)?;
+        let ret = self.store.merge(&file_ids)?;
         self.store.finish_merging(ret)
     }
 
