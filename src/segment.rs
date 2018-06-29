@@ -1,9 +1,9 @@
 use core::{Key, Result, Value};
-use std::fs::{create_dir_all, File, OpenOptions, remove_file};
+use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
+use io_at::Cursor;
+use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
-use io_at::Cursor;
-use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
 
 pub type Offset = u64;
 
@@ -15,7 +15,6 @@ struct SegmentEntry {
     key_size: u64,
     value_size: u64,
 }
-
 
 fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
     let key_size = file.read_varint::<u64>()?;
@@ -33,11 +32,10 @@ fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
         value: value_buf,
         key_length: key_size.required_space(),
         value_length: value_size.required_space(),
-        key_size: key_size,
-        value_size: value_size,
+        key_size,
+        value_size,
     })
 }
-
 
 pub struct Segment {
     file_path: PathBuf,
@@ -105,7 +103,10 @@ impl Segment {
         let value_size_length = file.write_varint(value_buf.len() as u64)?;
         debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
         file.write_all(value_buf)?;
-        self.size += key_size_length as u64 + value_size_length as u64 + key_buf.len() as u64 + value_buf.len() as u64;
+        self.size += key_size_length as u64
+            + value_size_length as u64
+            + key_buf.len() as u64
+            + value_buf.len() as u64;
         Ok(offset)
     }
 
@@ -136,10 +137,7 @@ impl<'a> IntoIterator for &'a Segment {
 
 impl<'a> SegmentIterator<'a> {
     fn new(segment: &'a Segment) -> SegmentIterator<'a> {
-        SegmentIterator {
-            segment,
-            offset: 0,
-        }
+        SegmentIterator { segment, offset: 0 }
     }
 }
 
@@ -148,7 +146,6 @@ pub struct Entry {
     pub key: Key,
     pub value: Value,
 }
-
 
 impl<'a> Iterator for SegmentIterator<'a> {
     type Item = Result<Entry>;
@@ -173,7 +170,10 @@ impl<'a> Iterator for SegmentIterator<'a> {
             offset: self.offset,
         };
 
-        self.offset += segment_entry.key_length as u64 + segment_entry.value_length as u64 + segment_entry.key_size + segment_entry.value_size;
+        self.offset += segment_entry.key_length as u64
+            + segment_entry.value_length as u64
+            + segment_entry.key_size
+            + segment_entry.value_size;
 
         Some(Ok(entry))
     }

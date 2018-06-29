@@ -1,13 +1,13 @@
-use ::core::{Key, Result, Value, Config};
-use ::segment::{Offset, Segment};
-use ::hint::Hint;
-use std::collections::HashMap;
-use std::fs::{read_dir, rename};
-use std::path::PathBuf;
-use std::mem;
-use std::sync::{RwLock, Arc};
+use core::{Config, Key, Result, Value};
+use hint::Hint;
 use keys_iterator::StoreKeys;
 use regex::bytes::Regex;
+use segment::{Offset, Segment};
+use std::collections::HashMap;
+use std::fs::{read_dir, rename};
+use std::mem;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 pub const TOMBSTONE: &str = "<<>>";
 
@@ -16,16 +16,17 @@ lazy_static! {
     static ref ESCAPED_TOMBSTONE_REGEXP: Regex = Regex::new(r"<<>><<>>").expect("regexp");
 }
 
-
 pub fn escape_tombstone(value: &[u8]) -> Value {
-    TOMBSTONE_REGEXP.replace_all(value, &b"<<>><<>>"[..]).to_vec()
+    TOMBSTONE_REGEXP
+        .replace_all(value, &b"<<>><<>>"[..])
+        .to_vec()
 }
-
 
 pub fn unescape_tombstone(value: &[u8]) -> Value {
-    ESCAPED_TOMBSTONE_REGEXP.replace_all(value, &b"<<>>"[..]).to_vec()
+    ESCAPED_TOMBSTONE_REGEXP
+        .replace_all(value, &b"<<>>"[..])
+        .to_vec()
 }
-
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
@@ -66,7 +67,10 @@ impl ActiveData {
         }
 
         if let Some(pos) = self.pending_hashmap.get(&key) {
-            return self.pending_segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset));
+            return self
+                .pending_segments
+                .get(&pos.file_id)
+                .map_or(Ok(None), |s| s.get(pos.offset));
         }
         Ok(None)
     }
@@ -96,28 +100,29 @@ impl ActiveData {
         mem::swap(&mut self.active_hint, &mut hint);
         self.pending_hints.insert(hint.file_id, hint);
     }
-//
-//    pub fn delete(&mut self, key: Key) -> Result<bool> {
-//        self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
-//    }
+    //
+    //    pub fn delete(&mut self, key: Key) -> Result<bool> {
+    //        self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
+    //    }
 
     pub fn exists(&self, key: Key) -> Result<bool> {
         Ok(match self.active_hashmap.get(&key) {
             Some(v) => *v != Position::not_exist(),
-            None => {
-                match self.pending_hashmap.get(&key) {
-                    None => false,
-                    Some(v) => *v != Position::not_exist()
-                }
-            }
+            None => match self.pending_hashmap.get(&key) {
+                None => false,
+                Some(v) => *v != Position::not_exist(),
+            },
         })
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
-        Box::new(self.active_hashmap.keys().chain(self.pending_hashmap.keys()))
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+        Box::new(
+            self.active_hashmap
+                .keys()
+                .chain(self.pending_hashmap.keys()),
+        )
     }
 }
-
 
 pub struct OlderData {
     segments: HashMap<u64, Segment>,
@@ -126,11 +131,13 @@ pub struct OlderData {
     config: Arc<Config>,
 }
 
-
 impl OlderData {
     pub fn get(&self, key: Key) -> Result<Option<Value>> {
         if let Some(pos) = self.hashmap.get(&key) {
-            return self.segments.get(&pos.file_id).map_or(Ok(None), |s| s.get(pos.offset));
+            return self
+                .segments
+                .get(&pos.file_id)
+                .map_or(Ok(None), |s| s.get(pos.offset));
         }
         Ok(None)
     }
@@ -153,11 +160,10 @@ impl OlderData {
         Ok(())
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
         Box::new(self.hashmap.keys())
     }
 }
-
 
 pub struct Store {
     path: PathBuf,
@@ -166,7 +172,6 @@ pub struct Store {
     active_data: RwLock<ActiveData>,
     config: Arc<Config>,
 }
-
 
 impl Store {
     pub fn new(config: Arc<Config>) -> Self {
@@ -202,10 +207,20 @@ impl Store {
         for entry in read_dir(path).expect("read segments dir") {
             let entry = entry.expect("read path entry");
             let segment_path = entry.path();
-            if segment_path.extension().expect("get extension").to_string_lossy() != "data" {
+            if segment_path
+                .extension()
+                .expect("get extension")
+                .to_string_lossy() != "data"
+            {
                 continue;
             }
-            let file_id = segment_path.file_stem().expect("get file id").to_str().expect("to string").parse::<u64>().expect("parse int");
+            let file_id = segment_path
+                .file_stem()
+                .expect("get file id")
+                .to_str()
+                .expect("to string")
+                .parse::<u64>()
+                .expect("parse int");
             max_file_id = max_file_id.max(file_id);
             let seg = Segment::open(file_id, path);
             let mut hint = Hint::open(file_id, path);
@@ -220,7 +235,10 @@ impl Store {
                     let mut h = Hint::new(file_id, path);
                     for entry_result in &seg {
                         let entry = entry_result.expect("get entry");
-                        let pos = Position { file_id, offset: entry.offset };
+                        let pos = Position {
+                            file_id,
+                            offset: entry.offset,
+                        };
                         hashmap.insert(entry.key.clone(), pos);
                         h.insert(entry.key.clone(), pos);
                     }
@@ -231,7 +249,7 @@ impl Store {
             debug!(target: "bitcask::store::open", "add segment: {:?}", file_id);
             segments.insert(file_id, seg);
             hints.insert(file_id, hint.unwrap());
-        };
+        }
         Store {
             path: path.clone(),
             next_file_id: RwLock::new(max_file_id + 2),
@@ -255,7 +273,11 @@ impl Store {
     }
 
     pub fn get(&self, key: Key) -> Result<Option<Value>> {
-        let ret = self.active_data.read().expect("lock read").get(key.clone())?;
+        let ret = self
+            .active_data
+            .read()
+            .expect("lock read")
+            .get(key.clone())?;
         if let Some(v) = ret {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
@@ -285,7 +307,10 @@ impl Store {
             let mut next_file_id = self.next_file_id.write().expect("lock write");
             let file_id = *next_file_id;
             *next_file_id += 1;
-            active_data.rotate(Segment::new(file_id, &self.path), Hint::new(file_id, &self.path));
+            active_data.rotate(
+                Segment::new(file_id, &self.path),
+                Hint::new(file_id, &self.path),
+            );
             assert!(file_id < self.config.max_file_id);
         }
 
@@ -318,12 +343,21 @@ impl Store {
     }
 
     fn remove_segment(&self, file_id: u64) -> Result<()> {
-        self.older_data.write().expect("lock write").remove_segment(file_id)
+        self.older_data
+            .write()
+            .expect("lock write")
+            .remove_segment(file_id)
     }
 
     fn rename_segment(&self, from: u64, to: u64) -> Result<()> {
-        rename(Segment::get_path(from, &self.path), Segment::get_path(to, &self.path))?;
-        rename(Hint::get_path(from, &self.path), Hint::get_path(to, &self.path))?;
+        rename(
+            Segment::get_path(from, &self.path),
+            Segment::get_path(to, &self.path),
+        )?;
+        rename(
+            Hint::get_path(from, &self.path),
+            Hint::get_path(to, &self.path),
+        )?;
         Ok(())
     }
 
@@ -335,11 +369,26 @@ impl Store {
     }
 
     pub fn prepare_full_merging(&self) -> Vec<u64> {
-        self.older_data.read().expect("lock read").segments.keys().cloned().map(|s| s).collect()
+        self.older_data
+            .read()
+            .expect("lock read")
+            .segments
+            .keys()
+            .cloned()
+            .map(|s| s)
+            .collect()
     }
 
     pub fn prepare_merging_since(&self, file_id: u64) -> Vec<u64> {
-        self.older_data.read().expect("lock read").segments.keys().cloned().map(|s| s).filter(|s| *s >= file_id).collect()
+        self.older_data
+            .read()
+            .expect("lock read")
+            .segments
+            .keys()
+            .cloned()
+            .map(|s| s)
+            .filter(|s| *s >= file_id)
+            .collect()
     }
 
     pub fn merge(&self, file_ids: Vec<u64>) -> Result<MergeResult> {
@@ -373,7 +422,10 @@ impl Store {
                                 next_file_id += 1;
                             }
                             let offset = new_segment.insert(entry.key.clone(), entry.value)?;
-                            let pos = Position { file_id: new_segment.file_id, offset };
+                            let pos = Position {
+                                file_id: new_segment.file_id,
+                                offset,
+                            };
                             new_hint.insert(entry.key.clone(), pos)?;
                             new_hashmap.insert(entry.key, pos);
                         }
@@ -406,7 +458,10 @@ impl Store {
             let to_file_id = merge_result.to_remove_file_ids[i];
             self.rename_segment(*from_file_id, to_file_id)?;
             mapping.insert(*from_file_id, to_file_id);
-            older_data.add_segment(Segment::open(to_file_id, &self.path), Hint::open(to_file_id, &self.path)?);
+            older_data.add_segment(
+                Segment::open(to_file_id, &self.path),
+                Hint::open(to_file_id, &self.path)?,
+            );
         }
         for v in hashmap.values_mut() {
             v.file_id = mapping[&v.file_id];
