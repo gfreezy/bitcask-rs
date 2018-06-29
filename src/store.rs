@@ -7,8 +7,25 @@ use std::path::PathBuf;
 use std::mem;
 use std::sync::{RwLock, Arc};
 use keys_iterator::StoreKeys;
+use regex::bytes::Regex;
 
 pub const TOMBSTONE: &str = "<<>>";
+
+lazy_static! {
+    static ref TOMBSTONE_REGEXP: Regex = Regex::new(r"<<>>").expect("regexp");
+    static ref ESCAPED_TOMBSTONE_REGEXP: Regex = Regex::new(r"<<>><<>>").expect("regexp");
+}
+
+
+pub fn escape_tombstone(value: &[u8]) -> Value {
+    TOMBSTONE_REGEXP.replace_all(value, &b"<<>><<>>"[..]).to_vec()
+}
+
+
+pub fn unescape_tombstone(value: &[u8]) -> Value {
+    ESCAPED_TOMBSTONE_REGEXP.replace_all(value, &b"<<>>"[..]).to_vec()
+}
+
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Position {
@@ -79,10 +96,10 @@ impl ActiveData {
         mem::swap(&mut self.active_hint, &mut hint);
         self.pending_hints.insert(hint.file_id, hint);
     }
-
-    pub fn delete(&mut self, key: Key) -> Result<bool> {
-        self.insert(key, TOMBSTONE.as_bytes().to_vec())
-    }
+//
+//    pub fn delete(&mut self, key: Key) -> Result<bool> {
+//        self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
+//    }
 
     pub fn exists(&self, key: Key) -> Result<bool> {
         Ok(match self.active_hashmap.get(&key) {
@@ -243,7 +260,7 @@ impl Store {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
             }
-            return Ok(Some(v));
+            return Ok(Some(unescape_tombstone(&v)));
         }
 
         let ret = self.older_data.read().expect("lock read").get(key)?;
@@ -251,13 +268,17 @@ impl Store {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
             }
-            return Ok(Some(v));
+            return Ok(Some(unescape_tombstone(&v)));
         }
 
         Ok(None)
     }
 
     pub fn insert(&self, key: Key, value: Value) -> Result<()> {
+        self.insert_raw(key, escape_tombstone(&value))
+    }
+
+    fn insert_raw(&self, key: Key, value: Value) -> Result<()> {
         let mut active_data = self.active_data.write().expect("lock write");
         let to_rotate = active_data.insert(key, value)?;
         if to_rotate {
@@ -289,14 +310,11 @@ impl Store {
     }
 
     pub fn delete(&self, key: Key) -> Result<()> {
-        self.insert(key, TOMBSTONE.as_bytes().to_vec())
+        self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
     }
 
     pub fn exists(&self, key: Key) -> Result<bool> {
-        Ok(match self.get(key)? {
-            None => false,
-            Some(v) => v.as_slice() != TOMBSTONE.as_bytes()
-        })
+        Ok(self.get(key)?.is_some())
     }
 
     fn remove_segment(&self, file_id: u64) -> Result<()> {

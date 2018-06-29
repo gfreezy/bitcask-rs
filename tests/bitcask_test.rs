@@ -24,6 +24,25 @@ fn setup_test() -> Result<(), failure::Error> {
 
 
 #[test]
+fn it_can_escape() {
+    setup_test();
+    assert_eq!(bitcask_rs::escape_tombstone("<<>>".as_bytes()), "<<>><<>>".as_bytes().to_vec());
+    assert_eq!(bitcask_rs::escape_tombstone("aa<<>>hel<<>>sdf".as_bytes()), "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec());
+    assert_eq!(bitcask_rs::escape_tombstone("<<>><<>>".as_bytes()), "<<>><<>><<>><<>>".as_bytes().to_vec());
+}
+
+
+#[test]
+fn it_can_unescape() {
+    setup_test();
+    assert_eq!(bitcask_rs::unescape_tombstone("<<>><<>>".as_bytes()), "<<>>".as_bytes().to_vec());
+    assert_eq!(bitcask_rs::unescape_tombstone("aa<<>><<>>hel<<>><<>>sdf".as_bytes()), "aa<<>>hel<<>>sdf".as_bytes().to_vec());
+    assert_eq!(bitcask_rs::unescape_tombstone("<<>><<>><<>><<>>".as_bytes()), "<<>><<>>".as_bytes().to_vec());
+    assert_eq!(bitcask_rs::unescape_tombstone("<<>>".as_bytes()), "<<>>".as_bytes().to_vec());
+}
+
+
+#[test]
 fn it_set_a_and_get_a() {
     let _ = setup_test();
     let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store")).build().unwrap();
@@ -41,6 +60,12 @@ fn it_set_a_and_get_a() {
 
     let no_exist = bitcask.get("hello".to_string());
     assert_eq!(no_exist.unwrap(), None);
+
+    bitcask.set("hello".to_string(), "<<>>".as_bytes().to_vec());
+    assert_eq!(bitcask.get("hello".to_string()).unwrap(), Some("<<>>".as_bytes().to_vec()));
+
+    bitcask.set("hello".to_string(), "hello<<>><<>>haha".as_bytes().to_vec());
+    assert_eq!(bitcask.get("hello".to_string()).unwrap(), Some("hello<<>><<>>haha".as_bytes().to_vec()));
 }
 
 

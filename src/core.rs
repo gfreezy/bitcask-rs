@@ -1,8 +1,8 @@
-use failure::Error;
 use std;
 use std::path::PathBuf;
 use store::Store;
 use std::sync::Arc;
+use failure::Error;
 use keys_iterator::StoreKeys;
 
 

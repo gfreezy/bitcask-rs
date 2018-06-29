@@ -9,11 +9,9 @@ extern crate log;
 extern crate io_at;
 extern crate log4rs;
 extern crate integer_encoding;
-
-
-pub use core::{Config, ConfigBuilder};
-pub use core::Bitcask;
-use std::sync::{Once, ONCE_INIT};
+extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 mod core;
 mod segment;
@@ -21,6 +19,11 @@ mod store;
 mod active_data;
 mod keys_iterator;
 mod hint;
+
+pub use core::{Config, ConfigBuilder};
+pub use core::Bitcask;
+use std::sync::{Once, ONCE_INIT};
+pub use store::{escape_tombstone, unescape_tombstone};
 
 pub use keys_iterator::StoreKeys;
 
