@@ -80,7 +80,7 @@ impl ActiveData {
         let offset = active_segment.insert(key.clone(), value.clone())?;
         let file_id = active_segment.file_id;
         let position = Position { offset, file_id };
-        self.active_hint.insert(key.clone(), position);
+        self.active_hint.insert(key.clone(), position)?;
         let active_hashmap = &mut self.active_hashmap;
         active_hashmap.insert(key, position);
 
@@ -240,7 +240,7 @@ impl Store {
                             offset: entry.offset,
                         };
                         hashmap.insert(entry.key.clone(), pos);
-                        h.insert(entry.key.clone(), pos);
+                        h.insert(entry.key.clone(), pos).expect("insert");
                     }
                     hint = Ok(h);
                 }
