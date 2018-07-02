@@ -3,11 +3,10 @@ extern crate failure;
 #[macro_use]
 extern crate log;
 
+use std::fs;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use std::fs;
-
 
 fn setup_test() -> Result<(), failure::Error> {
     bitcask_rs::setup();
@@ -22,30 +21,51 @@ fn setup_test() -> Result<(), failure::Error> {
     Ok(())
 }
 
-
 #[test]
 fn it_can_escape() {
     setup_test();
-    assert_eq!(bitcask_rs::escape_tombstone("<<>>".as_bytes()), "<<>><<>>".as_bytes().to_vec());
-    assert_eq!(bitcask_rs::escape_tombstone("aa<<>>hel<<>>sdf".as_bytes()), "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec());
-    assert_eq!(bitcask_rs::escape_tombstone("<<>><<>>".as_bytes()), "<<>><<>><<>><<>>".as_bytes().to_vec());
+    assert_eq!(
+        bitcask_rs::escape_tombstone("<<>>".as_bytes()),
+        "<<>><<>>".as_bytes().to_vec()
+    );
+    assert_eq!(
+        bitcask_rs::escape_tombstone("aa<<>>hel<<>>sdf".as_bytes()),
+        "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec()
+    );
+    assert_eq!(
+        bitcask_rs::escape_tombstone("<<>><<>>".as_bytes()),
+        "<<>><<>><<>><<>>".as_bytes().to_vec()
+    );
 }
-
 
 #[test]
 fn it_can_unescape() {
     setup_test();
-    assert_eq!(bitcask_rs::unescape_tombstone("<<>><<>>".as_bytes()), "<<>>".as_bytes().to_vec());
-    assert_eq!(bitcask_rs::unescape_tombstone("aa<<>><<>>hel<<>><<>>sdf".as_bytes()), "aa<<>>hel<<>>sdf".as_bytes().to_vec());
-    assert_eq!(bitcask_rs::unescape_tombstone("<<>><<>><<>><<>>".as_bytes()), "<<>><<>>".as_bytes().to_vec());
-    assert_eq!(bitcask_rs::unescape_tombstone("<<>>".as_bytes()), "<<>>".as_bytes().to_vec());
+    assert_eq!(
+        bitcask_rs::unescape_tombstone("<<>><<>>".as_bytes()),
+        "<<>>".as_bytes().to_vec()
+    );
+    assert_eq!(
+        bitcask_rs::unescape_tombstone("aa<<>><<>>hel<<>><<>>sdf".as_bytes()),
+        "aa<<>>hel<<>>sdf".as_bytes().to_vec()
+    );
+    assert_eq!(
+        bitcask_rs::unescape_tombstone("<<>><<>><<>><<>>".as_bytes()),
+        "<<>><<>>".as_bytes().to_vec()
+    );
+    assert_eq!(
+        bitcask_rs::unescape_tombstone("<<>>".as_bytes()),
+        "<<>>".as_bytes().to_vec()
+    );
 }
-
 
 #[test]
 fn it_set_a_and_get_a() {
     let _ = setup_test();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default()
+        .path(PathBuf::from("target/store"))
+        .build()
+        .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     let key = "1111";
     let set_ret = bitcask.set(key.to_string(), vec![1, 2, 3]);
@@ -62,12 +82,17 @@ fn it_set_a_and_get_a() {
     assert_eq!(no_exist.unwrap(), None);
 
     bitcask.set("hello".to_string(), "<<>>".as_bytes().to_vec());
-    assert_eq!(bitcask.get("hello".to_string()).unwrap(), Some("<<>>".as_bytes().to_vec()));
+    assert_eq!(
+        bitcask.get("hello".to_string()).unwrap(),
+        Some("<<>>".as_bytes().to_vec())
+    );
 
     bitcask.set("hello".to_string(), "hello<<>><<>>haha".as_bytes().to_vec());
-    assert_eq!(bitcask.get("hello".to_string()).unwrap(), Some("hello<<>><<>>haha".as_bytes().to_vec()));
+    assert_eq!(
+        bitcask.get("hello".to_string()).unwrap(),
+        Some("hello<<>><<>>haha".as_bytes().to_vec())
+    );
 }
-
 
 fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
     for i in 1..end {
@@ -80,7 +105,10 @@ fn populate_store(end: u8, bitcask: &mut bitcask_rs::Bitcask) {
 #[test]
 fn it_should_compact() {
     let _ = setup_test();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store2")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default()
+        .path(PathBuf::from("target/store2"))
+        .build()
+        .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
@@ -94,7 +122,10 @@ fn it_should_compact() {
 #[test]
 fn it_should_build_from_segment_file() {
     let _ = setup_test();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store3")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default()
+        .path(PathBuf::from("target/store3"))
+        .build()
+        .unwrap();
     {
         let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
         populate_store(100, &mut bitcask);
@@ -109,7 +140,10 @@ fn it_should_build_from_segment_file() {
 #[test]
 fn it_should_access_from_multiple_thread() {
     let _ = setup_test();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store4")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default()
+        .path(PathBuf::from("target/store4"))
+        .build()
+        .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);
@@ -134,11 +168,13 @@ fn it_should_access_from_multiple_thread() {
     assert_eq!(ret.expect("u1"), ret2.unwrap());
 }
 
-
 #[test]
 fn it_should_compact_while_reading_from_other_thread() {
     let _ = setup_test();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store5")).build().unwrap();
+    let config = bitcask_rs::ConfigBuilder::default()
+        .path(PathBuf::from("target/store5"))
+        .build()
+        .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
     populate_store(100, &mut bitcask);
     populate_store(50, &mut bitcask);

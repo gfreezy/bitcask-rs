@@ -1,10 +1,9 @@
-use std;
-use std::path::PathBuf;
-use store::Store;
-use std::sync::Arc;
 use failure::Error;
 use keys_iterator::StoreKeys;
-
+use std;
+use std::path::PathBuf;
+use std::sync::Arc;
+use store::Store;
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -29,7 +28,6 @@ impl Default for Config {
         }
     }
 }
-
 
 pub struct Bitcask {
     config: Arc<Config>,
@@ -76,11 +74,11 @@ impl Bitcask {
             self.store.prepare_full_merging()
         };
         debug!(target: "core::merge", "file_ids: {:?}", file_ids);
-        let ret = self.store.merge(file_ids)?;
+        let ret = self.store.merge(&file_ids)?;
         self.store.finish_merging(ret)
     }
 
-    pub fn keys<'a>(&'a self) -> StoreKeys<'a> {
+    pub fn keys(&self) -> StoreKeys {
         self.store.keys()
     }
 }

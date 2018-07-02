@@ -1,19 +1,17 @@
 use core::{Key, Result};
-use store::Position;
+use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
+use io_at::Cursor;
 use segment::Offset;
-use std::fs::{create_dir_all, File, OpenOptions, remove_file};
+use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
-use io_at::Cursor;
-use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
-
+use store::Position;
 
 pub struct HintEntry {
     pub key: String,
     pub key_size: u64,
     pub position: Position,
 }
-
 
 fn read_from_cursor(file: &mut Cursor<&File>) -> Result<HintEntry> {
     let key_size = file.read_varint::<u64>()?;
@@ -27,14 +25,10 @@ fn read_from_cursor(file: &mut Cursor<&File>) -> Result<HintEntry> {
     debug!(target: "bitcask::hint::read_from_cursor", "get file pos {}", offset);
     Ok(HintEntry {
         key: String::from_utf8_lossy(&key_buf).to_string(),
-        key_size: key_size,
-        position: Position {
-            file_id,
-            offset,
-        }
+        key_size,
+        position: Position { file_id, offset },
     })
 }
-
 
 pub struct Hint {
     file_path: PathBuf,
@@ -70,9 +64,7 @@ impl Hint {
 
     pub fn open(file_id: u64, path: &PathBuf) -> Result<Self> {
         let file_path = Self::get_path(file_id, path);
-        let mut file = OpenOptions::new()
-            .read(true)
-            .open(&file_path)?;
+        let mut file = OpenOptions::new().read(true).open(&file_path)?;
 
         let size = file.seek(SeekFrom::End(0))?;
         Ok(Hint {
@@ -101,7 +93,10 @@ impl Hint {
         debug!(target: "bitcask::hint::insert", "insert file offset {:?}", position.offset);
         let file_offset_length = file.write_varint(position.offset)?;
 
-        self.size += key_size_length as u64 + file_id_length as u64 + file_offset_length as u64 + key_buf.len() as u64;
+        self.size += key_size_length as u64
+            + file_id_length as u64
+            + file_offset_length as u64
+            + key_buf.len() as u64;
         Ok(offset)
     }
 
@@ -116,12 +111,10 @@ impl Hint {
     }
 }
 
-
 pub struct HintIterator<'a> {
     hint: &'a Hint,
     offset: u64,
 }
-
 
 impl<'a> IntoIterator for &'a Hint {
     type Item = Result<HintEntry>;
@@ -134,7 +127,6 @@ impl<'a> IntoIterator for &'a Hint {
         }
     }
 }
-
 
 impl<'a> Iterator for HintIterator<'a> {
     type Item = Result<HintEntry>;
@@ -153,8 +145,10 @@ impl<'a> Iterator for HintIterator<'a> {
         let mut file = Cursor::new(self.hint.file.as_ref().expect("get file"), self.offset);
         let hint_entry = read_from_cursor(&mut file).expect("read from cursor");
 
-        self.offset += hint_entry.key_size.required_space() as u64 + hint_entry.position.file_id.required_space() as u64
-            + hint_entry.position.offset.required_space() as u64 + hint_entry.key_size;
+        self.offset += hint_entry.key_size.required_space() as u64
+            + hint_entry.position.file_id.required_space() as u64
+            + hint_entry.position.offset.required_space() as u64
+            + hint_entry.key_size;
 
         Some(Ok(hint_entry))
     }

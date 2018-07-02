@@ -6,22 +6,21 @@ extern crate failure;
 extern crate itertools;
 #[macro_use]
 extern crate log;
+extern crate integer_encoding;
 extern crate io_at;
 extern crate log4rs;
-extern crate integer_encoding;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
 
 mod core;
+mod hint;
+mod keys_iterator;
 mod segment;
 mod store;
-mod active_data;
-mod keys_iterator;
-mod hint;
 
-pub use core::{Config, ConfigBuilder};
 pub use core::Bitcask;
+pub use core::{Config, ConfigBuilder};
 use std::sync::{Once, ONCE_INIT};
 pub use store::{escape_tombstone, unescape_tombstone};
 
