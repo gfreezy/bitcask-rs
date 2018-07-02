@@ -8,4 +8,4 @@ rust:
 #    - rust: nightly
 #  fast_finish: true
 script:
-  -- cargo test --verbose -- --test-threads=1
+  - cargo test --verbose -- --test-threads=1
