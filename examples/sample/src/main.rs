@@ -1,17 +1,16 @@
 #![feature(nll)]
-extern crate bitcask_rs;
-extern crate actix_web;
 extern crate actix;
+extern crate actix_web;
+extern crate bitcask_rs;
 extern crate failure;
 extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 
+use actix::prelude::{Actor, Addr, Handler, Message, Syn, SyncArbiter, SyncContext};
+use actix_web::{App, AsyncResponder, FromRequest, FutureResponse, HttpRequest, HttpResponse, Query, server};
 use failure::Error;
-use futures::future::{Future, err};
-use actix_web::{server, App, HttpRequest, Responder, FutureResponse, HttpResponse, AsyncResponder, Query, FromRequest};
-use std::path::PathBuf;
-use actix::prelude::{Message, Actor, SyncContext, Handler, SyncArbiter, Addr, Syn};
+use futures::future::{err, Future};
 
 
 #[derive(Deserialize)]
@@ -148,7 +147,7 @@ struct AppState {
 
 fn main() {
     bitcask_rs::setup();
-    let config = bitcask_rs::ConfigBuilder::default().path(PathBuf::from("target/store3")).build().unwrap();
+    let config = bitcask_rs::Config::new("config.yml");
     let bitcask = bitcask_rs::Bitcask::open(config);
     let sys = actix::System::new("hello-world");
 

@@ -4,7 +4,7 @@ use keys_iterator::StoreKeys;
 use regex::bytes::Regex;
 use segment::{Offset, Segment};
 use std::collections::HashMap;
-use std::fs::{read_dir, rename};
+use std::fs::{create_dir_all, read_dir, rename};
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -115,7 +115,7 @@ impl ActiveData {
         })
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
         Box::new(
             self.active_hashmap
                 .keys()
@@ -160,7 +160,7 @@ impl OlderData {
         Ok(())
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
         Box::new(self.hashmap.keys())
     }
 }
@@ -200,6 +200,11 @@ impl Store {
 
     pub fn open(config: Arc<Config>) -> Self {
         let path = &config.path;
+
+        if !path.exists() {
+            create_dir_all(path).expect("create dir");
+        }
+
         let mut hashmap = HashMap::with_capacity(100);
         let mut segments = HashMap::with_capacity(100);
         let mut hints = HashMap::with_capacity(100);
@@ -211,9 +216,9 @@ impl Store {
                 .extension()
                 .expect("get extension")
                 .to_string_lossy() != "data"
-            {
-                continue;
-            }
+                {
+                    continue;
+                }
             let file_id = segment_path
                 .file_stem()
                 .expect("get file id")

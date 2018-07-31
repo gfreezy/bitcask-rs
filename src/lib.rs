@@ -12,6 +12,10 @@ extern crate log4rs;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_yaml;
 
 mod core;
 mod hint;

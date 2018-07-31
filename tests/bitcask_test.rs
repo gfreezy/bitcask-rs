@@ -23,7 +23,7 @@ fn setup_test() -> Result<(), failure::Error> {
 
 #[test]
 fn it_can_escape() {
-    setup_test();
+    let _ = setup_test();
     assert_eq!(
         bitcask_rs::escape_tombstone("<<>>".as_bytes()),
         "<<>><<>>".as_bytes().to_vec()
@@ -40,7 +40,7 @@ fn it_can_escape() {
 
 #[test]
 fn it_can_unescape() {
-    setup_test();
+    let _ = setup_test();
     assert_eq!(
         bitcask_rs::unescape_tombstone("<<>><<>>".as_bytes()),
         "<<>>".as_bytes().to_vec()
@@ -57,6 +57,23 @@ fn it_can_unescape() {
         bitcask_rs::unescape_tombstone("<<>>".as_bytes()),
         "<<>>".as_bytes().to_vec()
     );
+}
+
+
+#[test]
+fn it_can_parse_config() {
+    let _ = setup_test();
+    let config = bitcask_rs::Config::new("tests/correct_config.yml");
+    assert_eq!(config.max_file_id, 1000000000);
+    assert_eq!(config.path, PathBuf::from("bitcask/test/store"));
+}
+
+
+#[test]
+fn it_cannot_parse_config() {
+    let _ = setup_test();
+    let ret = std::panic::catch_unwind(|| bitcask_rs::Config::new("tests/wrong_config.yml"));
+    assert!(ret.is_err());
 }
 
 #[test]
