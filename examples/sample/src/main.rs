@@ -7,7 +7,7 @@ extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 
-use actix::prelude::{Actor, Addr, Handler, Message, Syn, SyncArbiter, SyncContext};
+use actix::prelude::{Actor, Addr, Handler, Message, SyncArbiter, SyncContext};
 use actix_web::{App, AsyncResponder, FromRequest, FutureResponse, HttpRequest, HttpResponse, Query, server};
 use failure::Error;
 use futures::future::{err, Future};
@@ -20,9 +20,9 @@ struct Info {
 }
 
 
-fn index(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+fn index(req: &HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
-    let addr: &Addr<Syn, BitcaskActor> = &state.addr;
+    let addr: &Addr<BitcaskActor> = &state.addr;
     addr.send(List).from_err()
         .map(move |ret|
             match ret {
@@ -31,13 +31,13 @@ fn index(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
             }).responder()
 }
 
-fn get(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+fn get(req: &HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let key = match Query::<Info>::extract(&req) {
         Ok(v) => v,
         Err(e) => return Box::new(err(e))
     };
     let state = req.state();
-    let addr: &Addr<Syn, BitcaskActor> = &state.addr;
+    let addr: &Addr<BitcaskActor> = &state.addr;
     addr.send(Get(key.key.clone())).from_err()
         .map(move |ret|
             match ret {
@@ -46,13 +46,13 @@ fn get(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
             }).responder()
 }
 
-fn set(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+fn set(req: &HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let info = match Query::<Info>::extract(&req) {
         Ok(v) => v,
         Err(e) => return Box::new(err(e))
     };
     let state = req.state();
-    let addr: &Addr<Syn, BitcaskActor> = &state.addr;
+    let addr: &Addr<BitcaskActor> = &state.addr;
     addr.send(Set(info.key.clone(), info.value.as_ref().map_or(vec![0], |v| v.as_bytes().to_vec()))).from_err()
         .map(|ret|
             match ret {
@@ -61,13 +61,13 @@ fn set(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
             }).responder()
 }
 
-fn delete(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+fn delete(req: &HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     let info = match Query::<Info>::extract(&req) {
         Ok(v) => v,
         Err(e) => return Box::new(err(e))
     };
     let state = req.state();
-    let addr: &Addr<Syn, BitcaskActor> = &state.addr;
+    let addr: &Addr<BitcaskActor> = &state.addr;
     addr.send(Delete(info.key.clone())).from_err()
         .map(|ret|
             match ret {
@@ -141,7 +141,7 @@ impl Handler<List> for BitcaskActor {
 }
 
 struct AppState {
-    addr: Addr<Syn, BitcaskActor>
+    addr: Addr<BitcaskActor>
 }
 
 
