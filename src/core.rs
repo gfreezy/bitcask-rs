@@ -1,9 +1,11 @@
 use failure::Error;
 use keys_iterator::StoreKeys;
 use std;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::sync::Arc;
 use store::Store;
+use std::fs::File;
+use serde_yaml;
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -11,6 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Builder, Clone)]
 #[builder(default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub path: PathBuf,
     pub max_size_per_segment: u64,
@@ -29,6 +32,15 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    pub fn new<T: AsRef<Path>>(config_path: T) -> Self {
+        let mut file = File::open(config_path).expect("open config path");
+        let config: Config = serde_yaml::from_reader(&mut file).expect("deserialize config file");
+        return config;
+    }
+}
+
+
 pub struct Bitcask {
     config: Arc<Config>,
     store: Arc<Store>,
@@ -37,6 +49,7 @@ pub struct Bitcask {
 impl Bitcask {
     pub fn new(config: Config) -> Self {
         let arc_config = Arc::new(config);
+
         Bitcask {
             store: Arc::new(Store::new(arc_config.clone())),
             config: arc_config,
@@ -52,6 +65,7 @@ impl Bitcask {
     }
 
     pub fn get(&self, key: Key) -> Result<Option<Value>> {
+
         self.store.get(key)
     }
 
