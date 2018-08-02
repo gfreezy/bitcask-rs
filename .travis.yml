@@ -8,9 +8,6 @@ rust:
 #  allow_failures:
 #    - rust: nightly
 #  fast_finish: true
-script:
-  - cargo test --verbose -- --test-threads=1
-
 addons:
   apt:
     packages:
