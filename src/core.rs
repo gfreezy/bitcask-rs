@@ -1,11 +1,11 @@
 use failure::Error;
 use keys_iterator::StoreKeys;
+use serde_yaml;
 use std;
-use std::path::{PathBuf, Path};
+use std::fs::File;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use store::Store;
-use std::fs::File;
-use serde_yaml;
 
 pub type Key = String;
 pub type Value = Vec<u8>;
@@ -40,7 +40,6 @@ impl Config {
     }
 }
 
-
 pub struct Bitcask {
     config: Arc<Config>,
     store: Arc<Store>,
@@ -65,7 +64,6 @@ impl Bitcask {
     }
 
     pub fn get(&self, key: Key) -> Result<Option<Value>> {
-
         self.store.get(key)
     }
 

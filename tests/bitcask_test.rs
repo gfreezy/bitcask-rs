@@ -1,43 +1,36 @@
 extern crate bitcask_rs;
 extern crate failure;
-#[macro_use]
 extern crate log;
 extern crate uuid;
 
 use std::fs;
+use std::panic;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use std::panic;
-
 
 fn run_test<T>(test: T) -> ()
-    where T: FnOnce(&str) -> () + panic::UnwindSafe {
+where
+    T: FnOnce(&str) -> () + panic::UnwindSafe,
+{
     setup();
 
     let uuid = uuid::Uuid::new_v4();
     let path = format!("target/store/{}", uuid.simple().to_string());
-    let result = panic::catch_unwind(|| {
-        test(&path)
-    });
+    let result = panic::catch_unwind(|| test(&path));
 
     teardown(&path);
 
     assert!(result.is_ok())
 }
 
-
-fn setup() -> Result<(), failure::Error> {
+fn setup() {
     bitcask_rs::setup();
-    Ok(())
 }
 
-
-fn teardown(path: &str) -> Result<(), failure::Error> {
-    fs::remove_dir_all(path)?;
-    Ok(())
+fn teardown(path: &str) {
+    let _ = fs::remove_dir_all(path);
 }
-
 
 #[test]
 fn it_can_escape() {
@@ -79,7 +72,6 @@ fn it_can_unescape() {
     })
 }
 
-
 #[test]
 fn it_can_parse_config() {
     run_test(|_| {
@@ -88,7 +80,6 @@ fn it_can_parse_config() {
         assert_eq!(config.path, PathBuf::from("bitcask/test/store"));
     })
 }
-
 
 #[test]
 fn it_cannot_parse_config() {
@@ -120,13 +111,13 @@ fn it_set_a_and_get_a() {
         let no_exist = bitcask.get("hello".to_string());
         assert_eq!(no_exist.unwrap(), None);
 
-        bitcask.set("hello".to_string(), "<<>>".as_bytes().to_vec());
+        bitcask.set("hello".to_string(), "<<>>".as_bytes().to_vec()).unwrap();
         assert_eq!(
             bitcask.get("hello".to_string()).unwrap(),
             Some("<<>>".as_bytes().to_vec())
         );
 
-        bitcask.set("hello".to_string(), "hello<<>><<>>haha".as_bytes().to_vec());
+        bitcask.set("hello".to_string(), "hello<<>><<>>haha".as_bytes().to_vec()).unwrap();
         assert_eq!(
             bitcask.get("hello".to_string()).unwrap(),
             Some("hello<<>><<>>haha".as_bytes().to_vec())
@@ -189,7 +180,7 @@ fn it_should_access_from_multiple_thread() {
         let mut bitcask = bitcask_rs::Bitcask::new(config.clone());
         populate_store(100, &mut bitcask);
         populate_store(50, &mut bitcask);
-        bitcask.set("1".to_string(), vec![1, 3, 4]);
+        bitcask.set("1".to_string(), vec![1, 3, 4]).unwrap();
 
         let bitcask_n = bitcask.clone();
         let handler = thread::spawn(move || {

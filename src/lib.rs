@@ -35,6 +35,6 @@ static INIT: Once = ONCE_INIT;
 /// Setup function that is only run once, even if called multiple times.
 pub fn setup() {
     INIT.call_once(|| {
-        log4rs::init_file("log4rs.yml", Default::default()).unwrap();
+        log4rs::init_file("log4rs.yml", Default::default()).expect("log4rs.yml not found");
     });
 }

@@ -10,21 +10,22 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 pub const TOMBSTONE: &str = "<<>>";
+pub const ESCAPED_TOMBSTONE: &str = "<<>><<>>";
 
 lazy_static! {
-    static ref TOMBSTONE_REGEXP: Regex = Regex::new(r"<<>>").expect("regexp");
-    static ref ESCAPED_TOMBSTONE_REGEXP: Regex = Regex::new(r"<<>><<>>").expect("regexp");
+    static ref TOMBSTONE_REGEXP: Regex = Regex::new(TOMBSTONE).expect("regexp");
+    static ref ESCAPED_TOMBSTONE_REGEXP: Regex = Regex::new(ESCAPED_TOMBSTONE).expect("regexp");
 }
 
 pub fn escape_tombstone(value: &[u8]) -> Value {
     TOMBSTONE_REGEXP
-        .replace_all(value, &b"<<>><<>>"[..])
+        .replace_all(value, ESCAPED_TOMBSTONE.as_bytes())
         .to_vec()
 }
 
 pub fn unescape_tombstone(value: &[u8]) -> Value {
     ESCAPED_TOMBSTONE_REGEXP
-        .replace_all(value, &b"<<>>"[..])
+        .replace_all(value, TOMBSTONE.as_bytes())
         .to_vec()
 }
 
@@ -115,7 +116,7 @@ impl ActiveData {
         })
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
         Box::new(
             self.active_hashmap
                 .keys()
@@ -160,7 +161,7 @@ impl OlderData {
         Ok(())
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item=&'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
         Box::new(self.hashmap.keys())
     }
 }
@@ -215,10 +216,11 @@ impl Store {
             if segment_path
                 .extension()
                 .expect("get extension")
-                .to_string_lossy() != "data"
-                {
-                    continue;
-                }
+                .to_string_lossy()
+                != "data"
+            {
+                continue;
+            }
             let file_id = segment_path
                 .file_stem()
                 .expect("get file id")
