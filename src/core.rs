@@ -63,7 +63,7 @@ impl Bitcask {
         }
     }
 
-    pub fn get(&self, key: Key) -> Result<Option<Value>> {
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
         self.store.get(key)
     }
 
@@ -75,7 +75,7 @@ impl Bitcask {
         self.store.delete(key)
     }
 
-    pub fn exists(&self, key: Key) -> Result<bool> {
+    pub fn exists(&self, key: &Key) -> Result<bool> {
         self.store.exists(key)
     }
 

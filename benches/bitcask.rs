@@ -29,7 +29,7 @@ fn get_latency(b: &mut Bencher) {
     assert!(set_ret.is_ok());
 
     b.bytes = vec.len() as u64;
-    b.iter(|| bitcask.get(key.clone()).unwrap());
+    b.iter(|| bitcask.get(&key).unwrap());
 
     fs::remove_dir_all(path).unwrap();
 }

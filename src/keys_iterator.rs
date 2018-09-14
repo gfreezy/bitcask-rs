@@ -41,8 +41,7 @@ impl<'a> Iterator for StoreKeysIter<'a> {
         loop {
             let v = self.iter.next();
             let i = v?;
-            if !self.seen.contains(i) {
-                self.seen.insert(i.clone());
+            if self.seen.insert(i.clone()) {
                 return v;
             } else {
                 continue;

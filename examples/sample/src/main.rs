@@ -111,7 +111,7 @@ impl Handler<Get> for BitcaskActor {
     type Result = Result<Option<Vec<u8>>, Error>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
-        self.0.get(msg.0)
+        self.0.get(&msg.0)
     }
 }
 

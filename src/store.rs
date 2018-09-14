@@ -62,12 +62,12 @@ pub struct ActiveData {
 }
 
 impl ActiveData {
-    pub fn get(&self, key: Key) -> Result<Option<Value>> {
-        if let Some(pos) = self.active_hashmap.get(&key) {
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+        if let Some(pos) = self.active_hashmap.get(key) {
             return self.active_segment.get(pos.offset);
         }
 
-        if let Some(pos) = self.pending_hashmap.get(&key) {
+        if let Some(pos) = self.pending_hashmap.get(key) {
             return self
                 .pending_segments
                 .get(&pos.file_id)
@@ -133,8 +133,8 @@ pub struct OlderData {
 }
 
 impl OlderData {
-    pub fn get(&self, key: Key) -> Result<Option<Value>> {
-        if let Some(pos) = self.hashmap.get(&key) {
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+        if let Some(pos) = self.hashmap.get(key) {
             return self
                 .segments
                 .get(&pos.file_id)
@@ -279,12 +279,12 @@ impl Store {
         }
     }
 
-    pub fn get(&self, key: Key) -> Result<Option<Value>> {
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
         let ret = self
             .active_data
             .read()
             .expect("lock read")
-            .get(key.clone())?;
+            .get(key)?;
         if let Some(v) = ret {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
@@ -345,7 +345,7 @@ impl Store {
         self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
     }
 
-    pub fn exists(&self, key: Key) -> Result<bool> {
+    pub fn exists(&self, key: &Key) -> Result<bool> {
         Ok(self.get(key)?.is_some())
     }
 
