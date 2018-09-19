@@ -2,7 +2,7 @@ use core::{Key, Result, Value};
 use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
 use io_at::Cursor;
 use std::fs::{create_dir_all, remove_file, File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write, BufReader, BufWriter};
 use std::path::PathBuf;
 use std::hash::Hasher;
 use twox_hash::XxHash;
@@ -57,7 +57,7 @@ impl SegmentEntry {
     }
 }
 
-fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
+fn read_from_cursor(file: &mut BufReader<Cursor<&File>>) -> Result<SegmentEntry> {
     let key_size = file.read_varint::<u64>()?;
     debug!(target: "bitcask::segment", "get key size {}", key_size);
     let mut key_buf = vec![0; key_size as usize];
@@ -78,7 +78,7 @@ fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
 }
 
 
-fn write_at_cursor(entry: &SegmentEntry, file: &mut Cursor<&File>) -> Result<u64> {
+fn write_at_cursor(entry: &SegmentEntry, file: &mut BufWriter<Cursor<&File>>) -> Result<u64> {
     let key_buf = entry.key.as_slice();
     debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
     let _key_size_length = file.write_varint(key_buf.len() as u64)?;
@@ -144,13 +144,13 @@ impl Segment {
     }
 
     pub fn get(&self, offset: Offset) -> Result<Option<Value>> {
-        let mut file = Cursor::new(self.file.as_ref().expect("get file"), offset);
+        let mut file = BufReader::new(Cursor::new(self.file.as_ref().expect("get file"), offset));
         Ok(Some(read_from_cursor(&mut file)?.value))
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<Offset> {
         let offset = self.size;
-        let mut file = Cursor::new(self.file.as_ref().expect("get file"), offset);
+        let mut file = BufWriter::new(Cursor::new(self.file.as_ref().expect("get file"), offset));
         let entry = SegmentEntry::new(key, value);
         self.size += write_at_cursor(&entry, &mut file)?;
         Ok(offset)
@@ -207,7 +207,7 @@ impl<'a> Iterator for SegmentIterator<'a> {
             self.offset,
             self.segment.size
         );
-        let mut file = Cursor::new(self.segment.file.as_ref().expect("get file"), self.offset);
+        let mut file = BufReader::new(Cursor::new(self.segment.file.as_ref().expect("get file"), self.offset));
         let segment_entry = read_from_cursor(&mut file).expect("read from cursor");
         let size = segment_entry.compute_size();
         let entry = Entry {

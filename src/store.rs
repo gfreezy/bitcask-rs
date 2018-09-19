@@ -19,15 +19,17 @@ lazy_static! {
     static ref ESCAPED_TOMBSTONE_REGEXP: Regex = Regex::new(ESCAPED_TOMBSTONE).expect("regexp");
 }
 
-pub fn escape_tombstone(value: &[u8]) -> Value {
+pub fn escape_tombstone(value: Value) -> Value {
+//    value
     TOMBSTONE_REGEXP
-        .replace_all(value, ESCAPED_TOMBSTONE.as_bytes())
+        .replace_all(&value, ESCAPED_TOMBSTONE.as_bytes())
         .to_vec()
 }
 
-pub fn unescape_tombstone(value: &[u8]) -> Value {
+pub fn unescape_tombstone(value: Value) -> Value {
+//    value
     ESCAPED_TOMBSTONE_REGEXP
-        .replace_all(value, TOMBSTONE.as_bytes())
+        .replace_all(&value, TOMBSTONE.as_bytes())
         .to_vec()
 }
 
@@ -297,7 +299,7 @@ impl Store {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
             }
-            return Ok(Some(unescape_tombstone(&v)));
+            return Ok(Some(unescape_tombstone(v)));
         }
 
         let ret = self.older_data.read().expect("lock read").get(key)?;
@@ -305,14 +307,14 @@ impl Store {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
             }
-            return Ok(Some(unescape_tombstone(&v)));
+            return Ok(Some(unescape_tombstone(v)));
         }
 
         Ok(None)
     }
 
     pub fn insert(&self, key: Key, value: Value) -> Result<()> {
-        self.insert_raw(key, escape_tombstone(&value))
+        self.insert_raw(key, escape_tombstone(value))
     }
 
     fn insert_raw(&self, key: Key, value: Value) -> Result<()> {
