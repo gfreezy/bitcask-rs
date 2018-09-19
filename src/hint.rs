@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use store::Position;
 
 pub struct HintEntry {
-    pub key: String,
+    pub key: Key,
     pub key_size: u64,
     pub position: Position,
 }
@@ -24,7 +24,7 @@ fn read_from_cursor(file: &mut Cursor<&File>) -> Result<HintEntry> {
     let offset = file.read_varint::<u64>()?;
     debug!(target: "bitcask::hint::read_from_cursor", "get file pos {}", offset);
     Ok(HintEntry {
-        key: String::from_utf8_lossy(&key_buf).to_string(),
+        key: key_buf,
         key_size,
         position: Position { file_id, offset },
     })
@@ -83,7 +83,7 @@ impl Hint {
     pub fn insert(&mut self, key: Key, position: Position) -> Result<Offset> {
         let offset = self.size;
         let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
-        let key_buf = key.as_bytes();
+        let key_buf = key.as_slice();
         debug!(target: "bitcask::hint::insert", "insert key size {}", key_buf.len());
         let key_size_length = file.write_varint(key_buf.len() as u64)?;
         debug!(target: "bitcask::hint::insert", "insert key buf {:?}", key_buf);

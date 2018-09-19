@@ -5,6 +5,8 @@ use regex::bytes::Regex;
 use segment::{Offset, Segment};
 use std::collections::HashMap;
 use std::fs::{create_dir_all, read_dir, rename};
+use std::borrow::Borrow;
+use std::hash::Hash;
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -62,7 +64,9 @@ pub struct ActiveData {
 }
 
 impl ActiveData {
-    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
+        where Key: Borrow<Q>,
+              Q: Hash + Eq + ?Sized {
         if let Some(pos) = self.active_hashmap.get(key) {
             return self.active_segment.get(pos.offset);
         }
@@ -116,7 +120,7 @@ impl ActiveData {
         })
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a Key> + 'a> {
         Box::new(
             self.active_hashmap
                 .keys()
@@ -133,7 +137,9 @@ pub struct OlderData {
 }
 
 impl OlderData {
-    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
+        where Key: Borrow<Q>,
+                Q: Eq + Hash + ?Sized {
         if let Some(pos) = self.hashmap.get(key) {
             return self
                 .segments
@@ -161,7 +167,7 @@ impl OlderData {
         Ok(())
     }
 
-    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a String> + 'a> {
+    pub fn keys<'a>(&'a self) -> Box<Iterator<Item = &'a Key> + 'a> {
         Box::new(self.hashmap.keys())
     }
 }
@@ -279,7 +285,9 @@ impl Store {
         }
     }
 
-    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
+        where Key: Borrow<Q>,
+            Q: Eq + Hash + ?Sized {
         let ret = self
             .active_data
             .read()

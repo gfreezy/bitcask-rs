@@ -9,7 +9,6 @@ use test::Bencher;
 use std::path::PathBuf;
 use std::fs;
 use rand::Rng;
-use itertools::Itertools;
 
 
 #[bench]
@@ -22,7 +21,7 @@ fn get_latency(b: &mut Bencher) {
         .build()
         .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
-    let key = vec![1u8; 512].iter().map(|i| format!("{}", i)).join("");
+    let key = vec![1u8; 512];
     let vec = vec![1u8; 4096];
 
     let set_ret = bitcask.set(key.clone(), vec.clone());
@@ -44,7 +43,7 @@ fn put_latency(b: &mut Bencher) {
         .build()
         .unwrap();
     let mut bitcask = bitcask_rs::Bitcask::new(config);
-    let key = vec![1u8; 512].iter().map(|i| format!("{}", i)).join("");
+    let key = vec![1u8; 512];
     let vec = vec![1u8; 4096];
 
     let set_ret = bitcask.set(key.clone(), vec.clone());

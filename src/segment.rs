@@ -4,16 +4,57 @@ use io_at::Cursor;
 use std::fs::{create_dir_all, remove_file, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
+use std::hash::Hasher;
+use twox_hash::XxHash;
+
+
+fn xxhash32(bufs: &[&[u8]]) -> u32 {
+    let mut hash = XxHash::with_seed(0);
+    for buf in bufs {
+        hash.write(buf)
+    }
+    hash.finish() as u32
+}
+
 
 pub type Offset = u64;
 
 struct SegmentEntry {
     key: Key,
     value: Value,
-    key_length: usize,
-    value_length: usize,
-    key_size: u64,
-    value_size: u64,
+}
+
+impl SegmentEntry {
+    pub fn new_checking_hash(key: Key, value: Value, hash: u32) -> SegmentEntry {
+        let entry = Self::new(key, value);
+        assert_eq!(hash, entry.compute_hash());
+        entry
+    }
+
+    pub fn new(key: Key, value: Value) -> SegmentEntry {
+        SegmentEntry {
+            key: key,
+            value: value,
+        }
+    }
+
+    pub fn compute_size(&self) -> u64 {
+        let key_buf = self.key.as_slice();
+        let key_size_length = (key_buf.len() as u64).required_space();
+        let value_buf = self.value.as_slice();
+        let value_size_length = (value_buf.len() as u64).required_space();
+        let hash_length = self.compute_hash().required_space();
+        let size = key_size_length as u64
+            + value_size_length as u64
+            + key_buf.len() as u64
+            + value_buf.len() as u64
+            + hash_length as u64;
+        size
+    }
+
+    pub fn compute_hash(&self) -> u32 {
+        xxhash32(&[self.key.as_slice(), self.value.as_slice()])
+    }
 }
 
 fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
@@ -27,14 +68,31 @@ fn read_from_cursor(file: &mut Cursor<&File>) -> Result<SegmentEntry> {
     let mut value_buf = vec![0; value_size as usize];
     file.read_exact(&mut value_buf)?;
     debug!(target: "bitcask::segment", "get value buf {:?}", value_buf);
-    Ok(SegmentEntry {
-        key: String::from_utf8_lossy(&key_buf).to_string(),
-        value: value_buf,
-        key_length: key_size.required_space(),
-        value_length: value_size.required_space(),
-        key_size,
-        value_size,
-    })
+    let hash = file.read_varint::<u32>()?;
+    debug!(target: "bitcask::segment", "get hash {}", hash);
+    Ok(SegmentEntry::new_checking_hash(
+        key_buf,
+        value_buf,
+        hash
+    ))
+}
+
+
+fn write_at_cursor(entry: &SegmentEntry, file: &mut Cursor<&File>) -> Result<u64> {
+    let key_buf = entry.key.as_slice();
+    debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
+    let _key_size_length = file.write_varint(key_buf.len() as u64)?;
+    debug!(target: "bitcask::segment", "insert key buf {:?}", key_buf);
+    file.write_all(key_buf)?;
+    let value_buf = entry.value.as_slice();
+    debug!(target: "bitcask::segment", "insert value size {}", value_buf.len());
+    let _value_size_length = file.write_varint(value_buf.len() as u64)?;
+    debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
+    file.write_all(value_buf)?;
+    let hash = entry.compute_hash();
+    debug!(target: "bitcask::segment", "insert hash {:?}", hash);
+    let _hash_length = file.write_varint(hash)?;
+    Ok(entry.compute_size())
 }
 
 pub struct Segment {
@@ -92,21 +150,9 @@ impl Segment {
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<Offset> {
         let offset = self.size;
-        let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
-        let key_buf = key.as_bytes();
-        debug!(target: "bitcask::segment", "insert key size {}", key_buf.len());
-        let key_size_length = file.write_varint(key_buf.len() as u64)?;
-        debug!(target: "bitcask::segment", "insert key buf {:?}", key_buf);
-        file.write_all(key_buf)?;
-        let value_buf = value.as_slice();
-        debug!(target: "bitcask::segment", "insert value size {}", value_buf.len());
-        let value_size_length = file.write_varint(value_buf.len() as u64)?;
-        debug!(target: "bitcask::segment", "insert value buf {:?}", value_buf);
-        file.write_all(value_buf)?;
-        self.size += key_size_length as u64
-            + value_size_length as u64
-            + key_buf.len() as u64
-            + value_buf.len() as u64;
+        let mut file = Cursor::new(self.file.as_ref().expect("get file"), offset);
+        let entry = SegmentEntry::new(key, value);
+        self.size += write_at_cursor(&entry, &mut file)?;
         Ok(offset)
     }
 
@@ -163,17 +209,14 @@ impl<'a> Iterator for SegmentIterator<'a> {
         );
         let mut file = Cursor::new(self.segment.file.as_ref().expect("get file"), self.offset);
         let segment_entry = read_from_cursor(&mut file).expect("read from cursor");
-
+        let size = segment_entry.compute_size();
         let entry = Entry {
             key: segment_entry.key,
             value: segment_entry.value,
             offset: self.offset,
         };
 
-        self.offset += segment_entry.key_length as u64
-            + segment_entry.value_length as u64
-            + segment_entry.key_size
-            + segment_entry.value_size;
+        self.offset += size;
 
         Some(Ok(entry))
     }

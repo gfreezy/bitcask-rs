@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::sync::RwLockReadGuard;
 use store::{ActiveData, OlderData};
+use core::Key;
 
 pub struct StoreKeys<'a> {
     pub active_data_guard: RwLockReadGuard<'a, ActiveData>,
@@ -8,7 +9,7 @@ pub struct StoreKeys<'a> {
 }
 
 impl<'a> IntoIterator for &'a StoreKeys<'a> {
-    type Item = &'a String;
+    type Item = &'a Key;
     type IntoIter = StoreKeysIter<'a>;
 
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
@@ -21,12 +22,12 @@ impl<'a> IntoIterator for &'a StoreKeys<'a> {
 }
 
 pub struct StoreKeysIter<'a> {
-    iter: Box<Iterator<Item = &'a String> + 'a>,
-    seen: HashSet<String>,
+    iter: Box<Iterator<Item = &'a Key> + 'a>,
+    seen: HashSet<Key>,
 }
 
 impl<'a> StoreKeysIter<'a> {
-    fn new(iter: Box<Iterator<Item = &'a String> + 'a>) -> StoreKeysIter<'a> {
+    fn new(iter: Box<Iterator<Item = &'a Key> + 'a>) -> StoreKeysIter<'a> {
         StoreKeysIter {
             iter,
             seen: HashSet::new(),
@@ -35,7 +36,7 @@ impl<'a> StoreKeysIter<'a> {
 }
 
 impl<'a> Iterator for StoreKeysIter<'a> {
-    type Item = &'a String;
+    type Item = &'a Key;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         loop {

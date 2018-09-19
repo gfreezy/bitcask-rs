@@ -111,7 +111,7 @@ impl Handler<Get> for BitcaskActor {
     type Result = Result<Option<Vec<u8>>, Error>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
-        self.0.get(&msg.0)
+        self.0.get(msg.0.as_bytes())
     }
 }
 
@@ -120,7 +120,7 @@ impl Handler<Set> for BitcaskActor {
     type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: Set, _: &mut Self::Context) -> Self::Result {
-        self.0.set(msg.0, msg.1)
+        self.0.set(msg.0.into_bytes(), msg.1)
     }
 }
 
@@ -128,7 +128,7 @@ impl Handler<Delete> for BitcaskActor {
     type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: Delete, _: &mut Self::Context) -> Self::Result {
-        self.0.delete(msg.0)
+        self.0.delete(msg.0.into_bytes())
     }
 }
 
@@ -136,7 +136,7 @@ impl Handler<List> for BitcaskActor {
     type Result = Result<Option<Vec<String>>, Error>;
 
     fn handle(&mut self, msg: List, ctx: &mut Self::Context) -> <Self as Handler<List>>::Result {
-        Ok(Some(self.0.keys().into_iter().map(|k| k.clone()).collect::<Vec<String>>()))
+        Ok(Some(self.0.keys().into_iter().map(|k| String::from_utf8_lossy(k).to_string()).collect::<Vec<String>>()))
     }
 }
 

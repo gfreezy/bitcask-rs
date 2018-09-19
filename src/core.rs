@@ -5,9 +5,11 @@ use std;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::hash::Hash;
 use store::Store;
+use std::borrow::Borrow;
 
-pub type Key = String;
+pub type Key = Vec<u8>;
 pub type Value = Vec<u8>;
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -63,7 +65,9 @@ impl Bitcask {
         }
     }
 
-    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
+        where Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized {
         self.store.get(key)
     }
 
