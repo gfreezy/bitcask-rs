@@ -20,17 +20,15 @@ lazy_static! {
 }
 
 pub fn escape_tombstone(value: Value) -> Value {
-//    value
     TOMBSTONE_REGEXP
         .replace_all(&value, ESCAPED_TOMBSTONE.as_bytes())
-        .to_vec()
+        .into_owned()
 }
 
 pub fn unescape_tombstone(value: Value) -> Value {
-//    value
     ESCAPED_TOMBSTONE_REGEXP
         .replace_all(&value, TOMBSTONE.as_bytes())
-        .to_vec()
+        .into_owned()
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

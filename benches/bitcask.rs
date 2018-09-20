@@ -9,11 +9,12 @@ use test::Bencher;
 use std::path::PathBuf;
 use std::fs;
 use rand::Rng;
+use rand::distributions::Alphanumeric;
 
 
 #[bench]
 fn get_latency(b: &mut Bencher) {
-    let id: String = rand::thread_rng().gen_ascii_chars().take(16).collect();
+    let id: String = rand::thread_rng().sample_iter(&Alphanumeric).take(16).collect();
     let path = format!("target/benches/bench-{}.db", id);
     let config = bitcask_rs::ConfigBuilder::default()
         .path(PathBuf::from(&path))
@@ -27,7 +28,6 @@ fn get_latency(b: &mut Bencher) {
     let set_ret = bitcask.set(key.clone(), vec.clone());
     assert!(set_ret.is_ok());
 
-    b.bytes = vec.len() as u64;
     b.iter(|| bitcask.get(&key).unwrap());
 
     fs::remove_dir_all(path).unwrap();
@@ -35,7 +35,7 @@ fn get_latency(b: &mut Bencher) {
 
 #[bench]
 fn put_latency(b: &mut Bencher) {
-    let id: String = rand::thread_rng().gen_ascii_chars().take(16).collect();
+    let id: String = rand::thread_rng().sample_iter(&Alphanumeric).take(16).collect();
     let path = format!("bench-{}.db", id);
     let config = bitcask_rs::ConfigBuilder::default()
         .path(PathBuf::from(&path))
@@ -49,8 +49,13 @@ fn put_latency(b: &mut Bencher) {
     let set_ret = bitcask.set(key.clone(), vec.clone());
     assert!(set_ret.is_ok());
 
-    b.bytes = vec.len() as u64;
     b.iter(|| bitcask.set(key.clone(), vec.clone()).unwrap());
 
     fs::remove_dir_all(path).unwrap();
+}
+
+#[bench]
+fn escape_tombstone(b: &mut Bencher) {
+    let value: Vec<u8> = vec![0;512];
+    b.iter(|| bitcask_rs::escape_tombstone(value.clone()));
 }
