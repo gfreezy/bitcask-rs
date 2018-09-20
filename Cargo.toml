@@ -3,8 +3,7 @@ name = "bitcask-rs"
 version = "0.1.0"
 authors = ["gfreezy <gfreezy@gmail.com>"]
 description = "Bitcask implemented in rust."
-license = "GPL-3.0"
-
+license = "MIT"
 
 [dependencies]
 failure = "0.1.2"
