@@ -1,4 +1,5 @@
 #![feature(nll)]
+#![feature(test)]
 
 #[macro_use]
 extern crate derive_builder;
@@ -17,6 +18,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_yaml;
 extern crate twox_hash;
+extern crate test;
 
 mod core;
 mod hint;
@@ -26,16 +28,16 @@ mod store;
 
 pub use core::Bitcask;
 pub use core::{Config, ConfigBuilder};
-use std::sync::{Once, ONCE_INIT};
-pub use store::{escape_tombstone, unescape_tombstone};
 
 pub use keys_iterator::StoreKeys;
 
+use std::sync::{Once, ONCE_INIT};
+
 static INIT: Once = ONCE_INIT;
 
-/// Setup function that is only run once, even if called multiple times.
-pub fn setup() {
+/// Read config file 'log4rs.yml'
+pub fn setup(path: &str) {
     INIT.call_once(|| {
-        log4rs::init_file("log4rs.yml", Default::default()).expect("log4rs.yml not found");
+        log4rs::init_file(path, Default::default()).expect("log4rs.yml not found");
     });
 }

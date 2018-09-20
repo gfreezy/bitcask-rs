@@ -53,9 +53,3 @@ fn put_latency(b: &mut Bencher) {
 
     fs::remove_dir_all(path).unwrap();
 }
-
-#[bench]
-fn escape_tombstone(b: &mut Bencher) {
-    let value: Vec<u8> = vec![0;512];
-    b.iter(|| bitcask_rs::escape_tombstone(value.clone()));
-}

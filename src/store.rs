@@ -486,3 +486,17 @@ impl Store {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+
+
+    #[bench]
+    fn bench_escape_tombstone(b: &mut Bencher) {
+        let value: Vec<u8> = vec![0;512];
+        b.iter(|| escape_tombstone(value.clone()));
+    }
+}

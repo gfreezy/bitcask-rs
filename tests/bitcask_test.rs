@@ -25,7 +25,7 @@ where
 }
 
 fn setup() {
-    bitcask_rs::setup();
+    bitcask_rs::setup("log4rs.yml");
 }
 
 fn teardown(path: &str) {
