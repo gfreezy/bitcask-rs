@@ -14,7 +14,7 @@ use rand::Rng;
 #[bench]
 fn get_latency(b: &mut Bencher) {
     let id: String = rand::thread_rng().gen_ascii_chars().take(16).collect();
-    let path = format!("bench-{}.db", id);
+    let path = format!("target/benches/bench-{}.db", id);
     let config = bitcask_rs::ConfigBuilder::default()
         .path(PathBuf::from(&path))
         .max_size_per_segment(50 * 1024 * 1024)
