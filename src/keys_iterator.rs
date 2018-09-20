@@ -1,7 +1,7 @@
+use core::Key;
 use std::collections::HashSet;
 use std::sync::RwLockReadGuard;
 use store::{ActiveData, OlderData};
-use core::Key;
 
 pub struct StoreKeys<'a> {
     pub active_data_guard: RwLockReadGuard<'a, ActiveData>,

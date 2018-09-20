@@ -17,8 +17,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_yaml;
-extern crate twox_hash;
 extern crate test;
+extern crate twox_hash;
 
 mod core;
 mod hint;

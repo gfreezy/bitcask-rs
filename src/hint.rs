@@ -80,7 +80,7 @@ impl Hint {
         Ok(Some(read_from_cursor(&mut file)?.position))
     }
 
-    pub fn insert(&mut self, key: Key, position: Position) -> Result<Offset> {
+    pub fn insert(&mut self, key: &Key, position: Position) -> Result<Offset> {
         let offset = self.size;
         let mut file = Cursor::new(self.file.as_mut().expect("get file"), offset);
         let key_buf = key.as_slice();

@@ -2,12 +2,12 @@ use failure::Error;
 use keys_iterator::StoreKeys;
 use serde_yaml;
 use std;
+use std::borrow::Borrow;
 use std::fs::File;
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::hash::Hash;
 use store::Store;
-use std::borrow::Borrow;
 
 pub type Key = Vec<u8>;
 pub type Value = Vec<u8>;
@@ -38,7 +38,7 @@ impl Config {
     pub fn new<T: AsRef<Path>>(config_path: T) -> Self {
         let mut file = File::open(config_path).expect("open config path");
         let config: Config = serde_yaml::from_reader(&mut file).expect("deserialize config file");
-        return config;
+        config
     }
 }
 
@@ -66,8 +66,10 @@ impl Bitcask {
     }
 
     pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
-        where Key: Borrow<Q>,
-        Q: Eq + Hash + ?Sized {
+    where
+        Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
         self.store.get(key)
     }
 
@@ -79,7 +81,11 @@ impl Bitcask {
         self.store.delete(key)
     }
 
-    pub fn exists(&self, key: &Key) -> Result<bool> {
+    pub fn exists<Q>(&self, key: &Q) -> Result<bool>
+    where
+        Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
         self.store.exists(key)
     }
 

@@ -33,46 +33,6 @@ fn teardown(path: &str) {
 }
 
 #[test]
-fn it_can_escape() {
-    run_test(|_| {
-        assert_eq!(
-            bitcask_rs::escape_tombstone(b"<<>>".to_vec()),
-            "<<>><<>>".as_bytes().to_vec()
-        );
-        assert_eq!(
-            bitcask_rs::escape_tombstone(b"aa<<>>hel<<>>sdf".to_vec()),
-            "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec()
-        );
-        assert_eq!(
-            bitcask_rs::escape_tombstone(b"<<>><<>>".to_vec()),
-            "<<>><<>><<>><<>>".as_bytes().to_vec()
-        );
-    });
-}
-
-#[test]
-fn it_can_unescape() {
-    run_test(|_| {
-        assert_eq!(
-            bitcask_rs::unescape_tombstone(b"<<>><<>>".to_vec()),
-            "<<>>".as_bytes().to_vec()
-        );
-        assert_eq!(
-            bitcask_rs::unescape_tombstone(b"aa<<>><<>>hel<<>><<>>sdf".to_vec()),
-            "aa<<>>hel<<>>sdf".as_bytes().to_vec()
-        );
-        assert_eq!(
-            bitcask_rs::unescape_tombstone(b"<<>><<>><<>><<>>".to_vec()),
-            "<<>><<>>".as_bytes().to_vec()
-        );
-        assert_eq!(
-            bitcask_rs::unescape_tombstone(b"<<>>".to_vec()),
-            "<<>>".as_bytes().to_vec()
-        );
-    })
-}
-
-#[test]
 fn it_can_parse_config() {
     run_test(|_| {
         let config = bitcask_rs::Config::new("tests/correct_config.yml");
@@ -117,7 +77,9 @@ fn it_set_a_and_get_a() {
             Some("<<>>".as_bytes().to_vec())
         );
 
-        bitcask.set(b"hello".to_vec(), b"hello<<>><<>>haha".to_vec()).unwrap();
+        bitcask
+            .set(b"hello".to_vec(), b"hello<<>><<>>haha".to_vec())
+            .unwrap();
         assert_eq!(
             bitcask.get(b"hello".as_ref()).unwrap(),
             Some(b"hello<<>><<>>haha".to_vec())

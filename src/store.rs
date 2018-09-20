@@ -3,9 +3,9 @@ use hint::Hint;
 use keys_iterator::StoreKeys;
 use regex::bytes::Regex;
 use segment::{Offset, Segment};
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, read_dir, rename};
-use std::borrow::Borrow;
 use std::hash::Hash;
 use std::mem;
 use std::path::PathBuf;
@@ -65,8 +65,10 @@ pub struct ActiveData {
 
 impl ActiveData {
     pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
-        where Key: Borrow<Q>,
-              Q: Hash + Eq + ?Sized {
+    where
+        Key: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         if let Some(pos) = self.active_hashmap.get(key) {
             return self.active_segment.get(pos.offset);
         }
@@ -82,10 +84,10 @@ impl ActiveData {
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<bool> {
         let active_segment = &mut self.active_segment;
-        let offset = active_segment.insert(key.clone(), value.clone())?;
+        let offset = active_segment.insert(key.clone(), value)?;
         let file_id = active_segment.file_id;
         let position = Position { offset, file_id };
-        self.active_hint.insert(key.clone(), position)?;
+        self.active_hint.insert(&key, position)?;
         let active_hashmap = &mut self.active_hashmap;
         active_hashmap.insert(key, position);
 
@@ -110,10 +112,10 @@ impl ActiveData {
     //        self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
     //    }
 
-    pub fn exists(&self, key: Key) -> Result<bool> {
-        Ok(match self.active_hashmap.get(&key) {
+    pub fn exists(&self, key: &Key) -> Result<bool> {
+        Ok(match self.active_hashmap.get(key) {
             Some(v) => *v != Position::not_exist(),
-            None => match self.pending_hashmap.get(&key) {
+            None => match self.pending_hashmap.get(key) {
                 None => false,
                 Some(v) => *v != Position::not_exist(),
             },
@@ -138,8 +140,10 @@ pub struct OlderData {
 
 impl OlderData {
     pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
-        where Key: Borrow<Q>,
-                Q: Eq + Hash + ?Sized {
+    where
+        Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
         if let Some(pos) = self.hashmap.get(key) {
             return self
                 .segments
@@ -252,8 +256,8 @@ impl Store {
                             file_id,
                             offset: entry.offset,
                         };
-                        hashmap.insert(entry.key.clone(), pos);
-                        h.insert(entry.key.clone(), pos).expect("insert");
+                        h.insert(&entry.key, pos).expect("insert");
+                        hashmap.insert(entry.key, pos);
                     }
                     hint = Ok(h);
                 }
@@ -286,13 +290,11 @@ impl Store {
     }
 
     pub fn get<Q>(&self, key: &Q) -> Result<Option<Value>>
-        where Key: Borrow<Q>,
-            Q: Eq + Hash + ?Sized {
-        let ret = self
-            .active_data
-            .read()
-            .expect("lock read")
-            .get(key)?;
+    where
+        Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        let ret = self.active_data.read().expect("lock read").get(key)?;
         if let Some(v) = ret {
             if v.as_slice() == TOMBSTONE.as_bytes() {
                 return Ok(None);
@@ -352,8 +354,11 @@ impl Store {
     pub fn delete(&self, key: Key) -> Result<()> {
         self.insert_raw(key, TOMBSTONE.as_bytes().to_vec())
     }
-
-    pub fn exists(&self, key: &Key) -> Result<bool> {
+    pub fn exists<Q>(&self, key: &Q) -> Result<bool>
+    where
+        Key: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
         Ok(self.get(key)?.is_some())
     }
 
@@ -441,7 +446,7 @@ impl Store {
                                 file_id: new_segment.file_id,
                                 offset,
                             };
-                            new_hint.insert(entry.key.clone(), pos)?;
+                            new_hint.insert(&entry.key, pos)?;
                             new_hashmap.insert(entry.key, pos);
                         }
                     }
@@ -487,16 +492,51 @@ impl Store {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use test::Bencher;
 
-
     #[bench]
     fn bench_escape_tombstone(b: &mut Bencher) {
-        let value: Vec<u8> = vec![0;512];
+        let value: Vec<u8> = vec![0; 512];
         b.iter(|| escape_tombstone(value.clone()));
     }
+
+    #[test]
+    fn it_can_escape() {
+        assert_eq!(
+            escape_tombstone(b"<<>>".to_vec()),
+            "<<>><<>>".as_bytes().to_vec()
+        );
+        assert_eq!(
+            escape_tombstone(b"aa<<>>hel<<>>sdf".to_vec()),
+            "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec()
+        );
+        assert_eq!(
+            escape_tombstone(b"<<>><<>>".to_vec()),
+            "<<>><<>><<>><<>>".as_bytes().to_vec()
+        );
+    }
+
+    #[test]
+    fn it_can_unescape() {
+        assert_eq!(
+            unescape_tombstone(b"<<>><<>>".to_vec()),
+            "<<>>".as_bytes().to_vec()
+        );
+        assert_eq!(
+            unescape_tombstone(b"aa<<>><<>>hel<<>><<>>sdf".to_vec()),
+            "aa<<>>hel<<>>sdf".as_bytes().to_vec()
+        );
+        assert_eq!(
+            unescape_tombstone(b"<<>><<>><<>><<>>".to_vec()),
+            "<<>><<>>".as_bytes().to_vec()
+        );
+        assert_eq!(
+            unescape_tombstone(b"<<>>".to_vec()),
+            "<<>>".as_bytes().to_vec()
+        );
+    }
+
 }

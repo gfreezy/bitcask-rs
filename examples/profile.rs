@@ -1,11 +1,10 @@
 extern crate bitcask_rs;
-extern crate rand;
 extern crate itertools;
+extern crate rand;
 
-use std::path::PathBuf;
-use std::fs;
 use rand::Rng;
-
+use std::fs;
+use std::path::PathBuf;
 
 fn main() {
     let id: String = rand::thread_rng().gen_ascii_chars().take(16).collect();
