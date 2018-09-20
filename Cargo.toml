@@ -1,9 +1,13 @@
 [package]
 name = "bitcask-rs"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["gfreezy <gfreezy@gmail.com>"]
 description = "Bitcask implemented in rust."
 license = "MIT"
+homepage = "https://github.com/gfreezy/bitcask-rs"
+repository = "https://github.com/gfreezy/bitcask-rs"
+readme = "README.md"
+keywords = ["bitcask", "kv"]
 
 [dependencies]
 failure = "0.1.2"
@@ -23,3 +27,6 @@ uuid = { version = "0.6.5", features = ["v4"] }
 
 [dev-dependencies]
 rand = "0.5.5"
+
+[badges]
+travis-ci = { repository = "gfreezy/bitcask-rs", branch = "master" }
