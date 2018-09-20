@@ -36,15 +36,15 @@ fn teardown(path: &str) {
 fn it_can_escape() {
     run_test(|_| {
         assert_eq!(
-            bitcask_rs::escape_tombstone("<<>>".as_bytes()),
+            bitcask_rs::escape_tombstone(b"<<>>".to_vec()),
             "<<>><<>>".as_bytes().to_vec()
         );
         assert_eq!(
-            bitcask_rs::escape_tombstone("aa<<>>hel<<>>sdf".as_bytes()),
+            bitcask_rs::escape_tombstone(b"aa<<>>hel<<>>sdf".to_vec()),
             "aa<<>><<>>hel<<>><<>>sdf".as_bytes().to_vec()
         );
         assert_eq!(
-            bitcask_rs::escape_tombstone("<<>><<>>".as_bytes()),
+            bitcask_rs::escape_tombstone(b"<<>><<>>".to_vec()),
             "<<>><<>><<>><<>>".as_bytes().to_vec()
         );
     });
@@ -54,19 +54,19 @@ fn it_can_escape() {
 fn it_can_unescape() {
     run_test(|_| {
         assert_eq!(
-            bitcask_rs::unescape_tombstone("<<>><<>>".as_bytes()),
+            bitcask_rs::unescape_tombstone(b"<<>><<>>".to_vec()),
             "<<>>".as_bytes().to_vec()
         );
         assert_eq!(
-            bitcask_rs::unescape_tombstone("aa<<>><<>>hel<<>><<>>sdf".as_bytes()),
+            bitcask_rs::unescape_tombstone(b"aa<<>><<>>hel<<>><<>>sdf".to_vec()),
             "aa<<>>hel<<>>sdf".as_bytes().to_vec()
         );
         assert_eq!(
-            bitcask_rs::unescape_tombstone("<<>><<>><<>><<>>".as_bytes()),
+            bitcask_rs::unescape_tombstone(b"<<>><<>><<>><<>>".to_vec()),
             "<<>><<>>".as_bytes().to_vec()
         );
         assert_eq!(
-            bitcask_rs::unescape_tombstone("<<>>".as_bytes()),
+            bitcask_rs::unescape_tombstone(b"<<>>".to_vec()),
             "<<>>".as_bytes().to_vec()
         );
     })
